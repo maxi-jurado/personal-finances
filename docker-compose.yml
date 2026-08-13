@@ -1,0 +1,38 @@
+# Finanzas Personales — dos servicios locales (backend + frontend).
+# Puertos deliberadamente no convencionales y ligados SOLO a 127.0.0.1
+# (nunca expuestos a la red). Ver docs/spec.md (seguridad).
+
+services:
+  backend:
+    build: ./backend
+    environment:
+      BACKEND_PORT: ${BACKEND_PORT:-7412}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:7413}
+      DATABASE_URL: sqlite:////data/finanzas.db
+      EXCHANGE_RATE_API_URL: ${EXCHANGE_RATE_API_URL:-https://open.er-api.com/v6/latest/USD}
+    volumes:
+      - finanzas-data:/data
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-7412}:${BACKEND_PORT:-7412}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${BACKEND_PORT:-7412}/api/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    environment:
+      FRONTEND_PORT: ${FRONTEND_PORT:-7413}
+      BACKEND_HOST: backend
+      BACKEND_PORT: ${BACKEND_PORT:-7412}
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-7413}:${FRONTEND_PORT:-7413}"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  finanzas-data:
