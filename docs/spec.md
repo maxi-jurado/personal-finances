@@ -285,3 +285,18 @@ funciones y módulos pequeños y con una responsabilidad.
   único** (p.ej. en `monthly_expenses`, categoría "ICOCA", en JPY); los gastos
   hormiga que se pagan con ella los deduce el usuario, no se trackean uno a uno.
   **Sin lógica de descuento/tarifa IC** en v1.
+- **D13 — Retiro de dinero (transfers) = movimiento entre monedas, no gasto:**
+  un `transfer` es un **retiro** que mueve plata de CLP a JPY, **no** un gasto.
+  Tiene dos patas nativas: descuenta `clp_charged` del saldo **CLP** (lo real que
+  cobró el banco) y suma `jpy_requested` al saldo **JPY** (efectivo recibido). En
+  el summary el saldo es **nativo por moneda** (cada moneda con sus propios
+  movimientos); la conversión con la tasa cacheada se usa solo para el
+  `total_equivalent` (el patrimonio del mes expresado en las 3 monedas). El
+  `effective_rate` sigue siendo `clp_charged / jpy_requested` (D6), informativo.
+- **D14 — UF en gastos fijos (diferido a v2):** algunos gastos fijos (p.ej.
+  créditos) están denominados en **UF**, que **no** es una de las 3 monedas del
+  alcance. En v1 los gastos fijos se registran en CLP/JPY/USD. La conversión
+  UF→CLP por el valor de la UF del mes correspondiente (para mantener el gasto
+  recurrente en un valor aproximado más exacto) se define en un spec aparte; no
+  se implementa en v1. Requiere ampliar el alcance de unidades (ver Boundaries:
+  "Ask first").

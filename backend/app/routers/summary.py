@@ -36,9 +36,11 @@ class SummaryRead(BaseModel):
 
     month: str
     rate_date: date | None
-    income: dict[Currency, Decimal]
-    expenses: dict[Currency, Decimal]
-    balance: dict[Currency, Decimal]
+    income: dict[Currency, Decimal]  # nativo por moneda
+    expenses: dict[Currency, Decimal]  # nativo por moneda
+    withdrawals: dict[Currency, Decimal]  # patas del retiro: CLP ≤ 0, JPY ≥ 0
+    balance: dict[Currency, Decimal]  # nativo por moneda
+    total_equivalent: dict[Currency, Decimal]  # balance consolidado y convertido
     cards: list[CardDebtRead]
 
 

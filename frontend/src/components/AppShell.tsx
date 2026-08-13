@@ -48,7 +48,7 @@ const NAV: NavItem[] = [
   },
   {
     id: "transfers",
-    label: "Giros",
+    label: "Retiros",
     render: () => <Transfers />,
   },
 ];

@@ -1,8 +1,8 @@
 """Tests del endpoint de consolidación `/api/summary?month=YYYY-MM` (Task 11).
 
-Usa tasas cacheadas (D1): 1 USD = 150 JPY = 900 CLP. Verifica balance en las 3
-monedas, que se agreguen todas las fuentes de gasto (mensual + fijo + tarjeta +
-giro) y que solo cuenten los movimientos del mes consultado.
+Modelo de **saldo nativo por moneda**: cada moneda suma/resta solo sus propios
+movimientos; el retiro mueve CLP→JPY (no es gasto); la conversión (tasa cacheada,
+D1: 1 USD = 150 JPY = 900 CLP) se usa solo para el `total_equivalent`.
 """
 
 from __future__ import annotations
@@ -40,24 +40,17 @@ def test_month_invalido_da_422(client):
 
 def test_mes_sin_datos_da_ceros(client, rates):
     body = client.get("/api/summary?month=2026-08").json()
-    for bucket in ("income", "expenses", "balance"):
+    for bucket in ("income", "expenses", "withdrawals", "balance", "total_equivalent"):
         for cur in ("CLP", "JPY", "USD"):
             assert _dec(body[bucket][cur]) == Decimal("0")
 
 
-def test_balance_en_las_tres_monedas(client, rates):
-    # Ingreso 2 USD (= 1800 CLP = 300 JPY).
+def test_saldo_nativo_por_moneda(client, rates):
+    # Sueldo 2 USD; gasto de tarjeta 900 CLP.
     client.post(
         "/api/income",
-        json={
-            "date": "2026-08-01",
-            "description": "Sueldo",
-            "category": "Salario",
-            "currency": "USD",
-            "amount": "2",
-        },
+        json={"date": "2026-08-01", "description": "Sueldo", "category": "Salario", "currency": "USD", "amount": "2"},
     )
-    # Gasto de tarjeta 900 CLP (= 1 USD = 150 JPY).
     client.post(
         "/api/card-expenses/1",
         json={"date": "2026-08-10", "description": "Compra", "category": "Varios", "amount_clp": "900"},
@@ -65,45 +58,40 @@ def test_balance_en_las_tres_monedas(client, rates):
 
     body = client.get("/api/summary?month=2026-08").json()
 
+    # Nativo: cada moneda solo con sus propios movimientos.
     assert _dec(body["income"]["USD"]) == Decimal("2")
-    assert _dec(body["income"]["CLP"]) == Decimal("1800")
-    assert _dec(body["income"]["JPY"]) == Decimal("300")
-
-    assert _dec(body["expenses"]["USD"]) == Decimal("1")
+    assert _dec(body["income"]["CLP"]) == Decimal("0")
     assert _dec(body["expenses"]["CLP"]) == Decimal("900")
-    assert _dec(body["expenses"]["JPY"]) == Decimal("150")
+    assert _dec(body["expenses"]["USD"]) == Decimal("0")
+    assert _dec(body["balance"]["USD"]) == Decimal("2")
+    assert _dec(body["balance"]["CLP"]) == Decimal("-900")
+    assert _dec(body["balance"]["JPY"]) == Decimal("0")
 
-    assert _dec(body["balance"]["USD"]) == Decimal("1")
-    assert _dec(body["balance"]["CLP"]) == Decimal("900")
-    assert _dec(body["balance"]["JPY"]) == Decimal("150")
+    # Total equivalente: todo el patrimonio convertido a cada moneda.
+    assert _dec(body["total_equivalent"]["USD"]) == Decimal("1")  # 2 USD − 900 CLP(=1 USD)
+    assert _dec(body["total_equivalent"]["CLP"]) == Decimal("900")
+    assert _dec(body["total_equivalent"]["JPY"]) == Decimal("150")
 
 
-def test_gastos_incluyen_todas_las_fuentes(client, rates):
-    # monthly 150 JPY (=1 USD), card 900 CLP (=1 USD), transfer clp_charged 900 (=1 USD),
-    # fixed 1 USD → total 4 USD en gastos.
-    client.post(
-        "/api/monthly-expenses",
-        json={"date": "2026-08-05", "description": "Súper", "category": "Comida", "currency": "JPY", "amount": "150"},
-    )
-    client.post(
-        "/api/card-expenses/1",
-        json={"date": "2026-08-06", "description": "Ropa", "category": "Varios", "amount_clp": "900"},
-    )
+def test_retiro_mueve_clp_a_jpy_y_no_es_gasto(client, rates):
+    # Banco cobra 65.000 CLP y entrega 10.000 JPY.
     client.post(
         "/api/transfers",
-        json={"date": "2026-08-07", "jpy_requested": "100000", "clp_charged": "900"},
-    )
-    client.post(
-        "/api/fixed-expenses",
-        json={"concept": "Netflix", "currency": "USD", "amount": "1", "payment_day": 5},
+        json={"date": "2026-08-07", "jpy_requested": "10000", "clp_charged": "65000"},
     )
 
     body = client.get("/api/summary?month=2026-08").json()
-    assert _dec(body["expenses"]["USD"]) == Decimal("4")
+
+    assert _dec(body["withdrawals"]["CLP"]) == Decimal("-65000")
+    assert _dec(body["withdrawals"]["JPY"]) == Decimal("10000")
+    # El retiro NO se cuenta como gasto.
+    assert _dec(body["expenses"]["CLP"]) == Decimal("0")
+    # El saldo nativo: CLP baja, JPY (efectivo) sube.
+    assert _dec(body["balance"]["CLP"]) == Decimal("-65000")
+    assert _dec(body["balance"]["JPY"]) == Decimal("10000")
 
 
 def test_gasto_fijo_cuenta_en_cualquier_mes(client, rates):
-    # Los gastos fijos son recurrentes (sin fecha): cuentan en todo mes consultado.
     client.post(
         "/api/fixed-expenses",
         json={"concept": "Arriendo", "currency": "USD", "amount": "10", "payment_day": 1},
@@ -111,6 +99,7 @@ def test_gasto_fijo_cuenta_en_cualquier_mes(client, rates):
     for month in ("2026-07", "2026-08", "2026-09"):
         body = client.get(f"/api/summary?month={month}").json()
         assert _dec(body["expenses"]["USD"]) == Decimal("10")
+        assert _dec(body["balance"]["USD"]) == Decimal("-10")
 
 
 def test_card_debt_por_tarjeta(client, rates):

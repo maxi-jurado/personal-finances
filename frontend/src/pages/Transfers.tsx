@@ -84,9 +84,10 @@ export default function Transfers() {
 
   return (
     <section>
-      <h2 className="text-xl font-semibold text-slate-800">Giros CLP → JPY</h2>
+      <h2 className="text-xl font-semibold text-slate-800">Retiro de dinero</h2>
       <p className="mt-1 text-sm text-slate-500">
-        Ingresa el JPY que pediste y el CLP que te cobró el banco; la tasa
+        Retiro de CLP a JPY: ingresa el JPY que recibiste y el CLP que te cobró
+        el banco. Descuenta el CLP real y suma el efectivo en yenes; la tasa
         efectiva se calcula sola (CLP por JPY).
       </p>
 
