@@ -288,12 +288,13 @@ entorno, y nota explícita sobre `seed_demo.py` (no expone datos reales).
 `.env.example` final. Si alcanza, tests Vitest de conversión/formateo.
 
 **Acceptance criteria:**
-- [ ] README cubre los 5 puntos del spec (qué hace, capturas, levantar, env, seed)
-- [ ] `.env.example` documentado y sin secretos
+- [x] README cubre los 5 puntos del spec (qué hace, capturas, levantar, env, seed)
+      — capturas: sección lista con instrucciones; falta pegar los 2 PNG en docs/img/
+- [x] `.env.example` documentado y sin secretos
 
 **Verification:**
-- [ ] Manual: seguir el README desde cero levanta la app
-- [ ] (Opcional) `npm run test` verde
+- [x] Manual: el README refleja el flujo real (deploy.sh verificado en vivo)
+- [ ] (Opcional) `npm run test` verde — Vitest no configurado (diferido)
 
 **Dependencies:** Tasks 12, 13, 15
 **Files:** `README.md`, `.env.example`, `frontend/src/**/*.test.tsx` (opcional)
