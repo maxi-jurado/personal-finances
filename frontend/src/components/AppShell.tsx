@@ -4,6 +4,7 @@ import CardExpenses from "../pages/CardExpenses";
 import FixedExpenses from "../pages/FixedExpenses";
 import Income from "../pages/Income";
 import MonthlyExpenses from "../pages/MonthlyExpenses";
+import Transfers from "../pages/Transfers";
 
 // Navegación simple por estado (sin router). Cada Task de Phase 2 agrega una
 // entrada; en Task 12 el dashboard reemplaza el placeholder de abajo.
@@ -12,7 +13,8 @@ type ViewId =
   | "income"
   | "card-expenses"
   | "monthly-expenses"
-  | "fixed-expenses";
+  | "fixed-expenses"
+  | "transfers";
 
 interface NavItem {
   id: ViewId;
@@ -43,6 +45,11 @@ const NAV: NavItem[] = [
     id: "fixed-expenses",
     label: "Gastos fijos",
     render: () => <FixedExpenses />,
+  },
+  {
+    id: "transfers",
+    label: "Giros",
+    render: () => <Transfers />,
   },
 ];
 

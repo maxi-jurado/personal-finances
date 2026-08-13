@@ -174,12 +174,12 @@ payment_day) + UI.
 jpy_requested` calculado en la app (D6) + UI.
 
 **Acceptance criteria:**
-- [ ] `effective_rate` se computa, no se ingresa
-- [ ] `jpy_requested = 0` no rompe (validación / rechazo)
+- [x] `effective_rate` se computa, no se ingresa
+- [x] `jpy_requested = 0` no rompe (validación / rechazo)
 
 **Verification:**
-- [ ] `pytest` de `effective_rate` pasa
-- [ ] Manual: crear giro y ver la tasa efectiva
+- [x] `pytest` de `effective_rate` pasa
+- [x] Manual: crear giro y ver la tasa efectiva
 
 **Dependencies:** Task 5
 **Files:** `backend/app/routers/transfers.py`, `frontend/src/pages/Transfers.tsx`, `frontend/src/api/transfers.ts`
