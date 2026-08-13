@@ -254,12 +254,12 @@ reales.
 `/api/summary` y el flujo de config/wizard. SQLite temporal, nunca la DB real.
 
 **Acceptance criteria:**
-- [ ] Cubre conversiones, effective_rate, summary, config
-- [ ] No toca red ni `finanzas.db`
+- [x] Cubre conversiones, effective_rate, summary, config
+- [x] No toca red ni `finanzas.db`
 
 **Verification:**
-- [ ] `pytest` verde
-- [ ] Manual: revisar cobertura de los 4 focos
+- [x] `pytest` verde (67 tests)
+- [x] Manual: revisar cobertura de los 4 focos
 
 **Dependencies:** Tasks 3, 5, 10, 11
 **Files:** `backend/tests/{conftest.py,test_exchange_rates.py,test_transfers.py,test_summary.py,test_config.py}`

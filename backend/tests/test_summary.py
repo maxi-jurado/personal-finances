@@ -120,6 +120,23 @@ def test_card_debt_por_tarjeta(client, rates):
     assert _dec(by_id[2]["debt"]["USD"]) == Decimal("2")
 
 
+def test_sin_tasas_ni_datos_da_ceros(client):
+    # Sin tasas cacheadas y sin movimientos: ceros y rate_date nulo (no 503).
+    body = client.get("/api/summary?month=2026-08").json()
+    assert body["rate_date"] is None
+    for cur in ("CLP", "JPY", "USD"):
+        assert _dec(body["balance"][cur]) == Decimal("0")
+
+
+def test_sin_tasas_con_datos_da_503(client):
+    # Hay movimientos pero no hay tasas cacheadas → no se puede consolidar.
+    client.post(
+        "/api/income",
+        json={"date": "2026-08-01", "description": "x", "category": "s", "currency": "USD", "amount": "1"},
+    )
+    assert client.get("/api/summary?month=2026-08").status_code == 503
+
+
 def test_solo_cuenta_movimientos_del_mes(client, rates):
     client.post(
         "/api/income",

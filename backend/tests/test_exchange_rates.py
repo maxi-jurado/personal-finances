@@ -33,6 +33,23 @@ def test_convert_usd_to_clp():
     assert fx.convert(Decimal("1"), Currency.USD, Currency.CLP, RATES) == Decimal("900")
 
 
+def test_convert_jpy_to_clp():
+    # 150 JPY = 1 USD = 900 CLP (tercer par, dirección faltante).
+    assert fx.convert(Decimal("150"), Currency.JPY, Currency.CLP, RATES) == Decimal("900")
+
+
+def test_convert_clp_to_usd():
+    assert fx.convert(Decimal("900"), Currency.CLP, Currency.USD, RATES) == Decimal("1")
+
+
+def test_convert_round_trip_preserva_el_monto():
+    # Ida y vuelta por cada par debe recuperar el monto original.
+    for src, dst in ((Currency.CLP, Currency.JPY), (Currency.USD, Currency.CLP), (Currency.USD, Currency.JPY)):
+        amount = Decimal("900")
+        back = fx.convert(fx.convert(amount, src, dst, RATES), dst, src, RATES)
+        assert back == amount
+
+
 def test_convert_same_currency_is_identity():
     assert fx.convert(Decimal("1234"), Currency.JPY, Currency.JPY, RATES) == Decimal("1234")
 
