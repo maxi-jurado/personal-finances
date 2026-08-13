@@ -275,7 +275,7 @@ con proxy `/api`→backend), `docker-compose.yml` con binds `127.0.0.1:7412` y
 - [x] Mapeo `127.0.0.1:...`, nunca `"7412:7412"`; CORS = `http://localhost:7413`
 
 **Verification:**
-- [ ] `docker-compose up` y app accesible en `localhost:7413` (pendiente: daemon Docker no disponible en el entorno de dev; a confirmar al desplegar)
+- [x] `docker-compose up` y app accesible en `localhost:7413` (verificado en vivo vía `deploy.sh`: frontend 200, API por nginx OK, summary poblado)
 - [x] Manual: `docker compose config` muestra binds a `127.0.0.1`
 
 **Dependencies:** Tasks 3, 12

@@ -81,27 +81,95 @@ seed_demo() {
     || die "Falló el seed. ¿Está el backend levantado? (./deploy.sh up)"
 }
 
+# ── Datos: siembra demo SOLO si la base está vacía (nunca pisa datos reales) ──
+data_exists() {
+  compose exec -T backend python -c \
+    "import sys; from app.database import SessionLocal; from app.models import Config; sys.exit(0 if SessionLocal().query(Config).first() else 1)" \
+    >/dev/null 2>&1
+}
+
+ensure_data() {
+  step "Verificando datos"
+  if data_exists; then
+    ok "ya hay datos configurados (no se tocan)"
+  else
+    info "base vacía: creando datos de demo…"
+    seed_demo
+  fi
+}
+
 summary() {
   printf "\n${BOLD}${GREEN}✔ Despliegue listo${RESET}\n"
   printf "  ${BOLD}Frontend:${RESET} ${CYAN}http://localhost:%s${RESET}\n" "$FRONTEND_PORT"
   printf "  ${BOLD}API docs:${RESET} ${CYAN}http://localhost:%s/docs${RESET}\n" "$BACKEND_PORT"
-  printf "\n  ${DIM}Comandos útiles:${RESET}\n"
-  printf "    ${DIM}./deploy.sh seed    → cargar datos de demo${RESET}\n"
-  printf "    ${DIM}./deploy.sh logs    → ver logs en vivo${RESET}\n"
-  printf "    ${DIM}./deploy.sh down    → detener el stack${RESET}\n"
+}
+
+# ── Consola en vivo: logs en primer plano; Ctrl+C baja el stack, 'd' lo suelta ─
+attach_console() {
+  printf "\n${BOLD}${CYAN}Consola en vivo${RESET}  ${DIM}[Ctrl+C] detener y bajar · [d] soltar (dejar corriendo)${RESET}\n\n"
+  local logs_pid
+  compose logs -f --tail=10 &
+  logs_pid=$!
+
+  _teardown() {
+    trap - INT TERM
+    kill "$logs_pid" 2>/dev/null || true
+    wait "$logs_pid" 2>/dev/null || true
+    printf "\n"
+    step "Deteniendo el stack…"
+    compose down
+    ok "stack detenido"
+    exit 0
+  }
+  trap _teardown INT TERM
+
+  while IFS= read -rsn1 key; do
+    if [[ "$key" == "d" || "$key" == "D" ]]; then
+      trap - INT TERM
+      kill "$logs_pid" 2>/dev/null || true
+      printf "\n"
+      ok "Consola soltada. El stack sigue corriendo en segundo plano."
+      info "Frontend: http://localhost:${FRONTEND_PORT}  ·  Bajar luego: ./deploy.sh down"
+      exit 0
+    fi
+  done
+  # EOF de stdin (p.ej. Ctrl+D): deja el stack corriendo.
+  kill "$logs_pid" 2>/dev/null || true
 }
 
 cmd_up() {
-  local do_seed=0
-  [[ "${1:-}" == "--seed" ]] && do_seed=1
+  local seed_mode="auto" detach=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --seed)      seed_mode="force" ;;
+      --no-seed)   seed_mode="skip" ;;
+      -d|--detach) detach=1 ;;
+      "") ;;
+      *) die "Opción desconocida para 'up': $1  (usa: --seed | --no-seed | --detach)" ;;
+    esac
+    shift
+  done
+
   check_prereqs
   step "Construyendo y levantando el stack"
   info "esto puede tardar la primera vez (build de imágenes)…"
   compose up -d --build
   ok "contenedores arriba"
   wait_healthy
-  [[ "$do_seed" -eq 1 ]] && seed_demo
+  case "$seed_mode" in
+    force) seed_demo ;;
+    auto)  ensure_data ;;
+    skip)  : ;;
+  esac
   summary
+
+  # Consola interactiva por defecto; con --detach o sin TTY, deja corriendo y sale.
+  if [[ $detach -eq 0 && -t 0 ]]; then
+    attach_console
+  else
+    printf "\n"
+    info "Contenedores corriendo en segundo plano. Bajar con: ./deploy.sh down"
+  fi
 }
 
 usage() {
@@ -109,12 +177,19 @@ usage() {
 deploy.sh — Despliegue local de Finanzas Personales con Docker Compose.
 
 Uso:
-  ./deploy.sh            Construye y levanta el stack (backend + frontend)
-  ./deploy.sh up --seed  Levanta y además puebla datos de demo
-  ./deploy.sh seed       Puebla datos de demo en el backend ya levantado
-  ./deploy.sh down       Detiene y elimina los contenedores
-  ./deploy.sh logs       Sigue los logs de ambos servicios
-  ./deploy.sh status     Muestra el estado de los servicios
+  ./deploy.sh                Construye, levanta y abre la consola en vivo.
+                             Si la base está vacía, crea datos de demo.
+  ./deploy.sh up --no-seed   Igual, pero sin crear datos de demo.
+  ./deploy.sh up --seed      Fuerza recargar los datos de demo (los reemplaza).
+  ./deploy.sh up --detach    Levanta y sale (no abre la consola en vivo).
+  ./deploy.sh seed           Puebla datos de demo en el backend ya levantado.
+  ./deploy.sh down           Detiene y elimina los contenedores.
+  ./deploy.sh logs           Sigue los logs de ambos servicios.
+  ./deploy.sh status         Muestra el estado de los servicios.
+
+En la consola en vivo:
+  [Ctrl+C]  detiene y baja el stack antes de cerrar.
+  [d]       suelta la consola y deja el stack corriendo en segundo plano.
 EOF
 }
 
@@ -124,7 +199,7 @@ cmd_status() { detect_compose; compose ps; }
 cmd_seed()   { detect_compose; seed_demo; }
 
 case "${1:-up}" in
-  up)      shift || true; cmd_up "${1:-}" ;;
+  up)      shift; cmd_up "$@" ;;
   down)    cmd_down ;;
   logs)    cmd_logs ;;
   status)  cmd_status ;;
