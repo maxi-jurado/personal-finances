@@ -197,12 +197,12 @@ jpy_requested` calculado en la app (D6) + UI.
 usando la última tasa cacheada (D1).
 
 **Acceptance criteria:**
-- [ ] Devuelve balance del mes en CLP, JPY y USD
-- [ ] `month` inválido → 422; mes sin datos → ceros
+- [x] Devuelve balance del mes en CLP, JPY y USD
+- [x] `month` inválido → 422; mes sin datos → ceros
 
 **Verification:**
-- [ ] `pytest` de summary con datos sembrados pasa
-- [ ] Manual: `?month=` de un mes con datos da números coherentes
+- [x] `pytest` de summary con datos sembrados pasa
+- [x] Manual: `?month=` de un mes con datos da números coherentes
 
 **Dependencies:** Tasks 3, 6–10
 **Files:** `backend/app/routers/summary.py`, `backend/app/services/summary.py`, `backend/tests/test_summary.py`

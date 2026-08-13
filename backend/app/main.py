@@ -21,6 +21,7 @@ from app.routers import (
     fixed_expenses,
     income,
     monthly_expenses,
+    summary,
     transfers,
 )
 
@@ -52,6 +53,7 @@ app.include_router(card_expenses.router)
 app.include_router(monthly_expenses.router)
 app.include_router(fixed_expenses.router)
 app.include_router(transfers.router)
+app.include_router(summary.router)
 
 
 @app.get("/api/health", tags=["health"])
