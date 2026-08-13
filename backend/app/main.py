@@ -18,6 +18,7 @@ from app.routers import (
     cards,
     config,
     exchange_rates,
+    fixed_expenses,
     income,
     monthly_expenses,
 )
@@ -48,6 +49,7 @@ app.include_router(income.router)
 app.include_router(cards.router)
 app.include_router(card_expenses.router)
 app.include_router(monthly_expenses.router)
+app.include_router(fixed_expenses.router)
 
 
 @app.get("/api/health", tags=["health"])

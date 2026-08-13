@@ -158,12 +158,12 @@ ICOCA como gasto (D12).
 payment_day) + UI.
 
 **Acceptance criteria:**
-- [ ] Se crea gasto fijo con `payment_day` 1–31
-- [ ] Moneda restringida a {CLP, JPY, USD}
+- [x] Se crea gasto fijo con `payment_day` 1–31
+- [x] Moneda restringida a {CLP, JPY, USD}
 
 **Verification:**
-- [ ] `pytest` de fixed-expenses pasa
-- [ ] Manual: crear "Arriendo" en JPY
+- [x] `pytest` de fixed-expenses pasa
+- [x] Manual: crear "Arriendo" en JPY
 
 **Dependencies:** Task 5
 **Files:** `backend/app/routers/fixed_expenses.py`, `frontend/src/pages/FixedExpenses.tsx`, `frontend/src/api/fixedExpenses.ts`
