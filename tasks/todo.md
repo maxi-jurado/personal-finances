@@ -214,13 +214,13 @@ usando la última tasa cacheada (D1).
 movimientos del mes.
 
 **Acceptance criteria:**
-- [ ] Saldo positivo en verde, negativo en rojo, en las 3 monedas
-- [ ] Deuda de tarjetas mostrada aparte, en rojo
-- [ ] Vista abre en el mes en curso
+- [x] Saldo positivo en verde, negativo en rojo, en las 3 monedas
+- [x] Deuda de tarjetas mostrada aparte, en rojo
+- [x] Vista abre en el mes en curso
 
 **Verification:**
-- [ ] `npm run build` OK
-- [ ] Manual: con seed, el dashboard muestra colores y montos correctos
+- [x] `npm run build` OK
+- [ ] Manual: con seed, el dashboard muestra colores y montos correctos (pendiente: requiere seed_demo, Task 13)
 
 **Dependencies:** Task 11
 **Files:** `frontend/src/pages/Dashboard.tsx`, `frontend/src/components/BalanceCard.tsx`, `frontend/src/api/summary.ts`

@@ -1,13 +1,14 @@
 import { useState } from "react";
 
 import CardExpenses from "../pages/CardExpenses";
+import Dashboard from "../pages/Dashboard";
 import FixedExpenses from "../pages/FixedExpenses";
 import Income from "../pages/Income";
 import MonthlyExpenses from "../pages/MonthlyExpenses";
 import Transfers from "../pages/Transfers";
 
 // Navegación simple por estado (sin router). Cada Task de Phase 2 agrega una
-// entrada; en Task 12 el dashboard reemplaza el placeholder de abajo.
+// entrada; el dashboard (Task 12) es la vista por defecto.
 type ViewId =
   | "dashboard"
   | "income"
@@ -23,13 +24,7 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  {
-    id: "dashboard",
-    label: "Dashboard",
-    render: () => (
-      <p className="text-slate-600">El dashboard se agrega en la Task 12.</p>
-    ),
-  },
+  { id: "dashboard", label: "Dashboard", render: () => <Dashboard /> },
   { id: "income", label: "Ingresos", render: () => <Income /> },
   {
     id: "card-expenses",
