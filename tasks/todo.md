@@ -238,12 +238,12 @@ movimientos del mes.
 reales.
 
 **Acceptance criteria:**
-- [ ] Corre idempotente sobre DB limpia y deja la app usable como demo
-- [ ] Datos repartidos en varios meses (D8)
+- [x] Corre idempotente sobre DB limpia y deja la app usable como demo
+- [x] Datos repartidos en varios meses (D8)
 
 **Verification:**
-- [ ] `python scripts/seed_demo.py` sin errores; dashboard y summary poblados
-- [ ] Manual: revisar realismo de montos/categorías
+- [x] `python scripts/seed_demo.py` sin errores; dashboard y summary poblados
+- [x] Manual: revisar realismo de montos/categorías
 
 **Dependencies:** Tasks 6–11
 **Files:** `backend/scripts/seed_demo.py`
