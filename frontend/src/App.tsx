@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { ApiError } from "./api/client";
 import { getConfig } from "./api/config";
+import AppShell from "./components/AppShell";
 import Wizard from "./pages/Wizard";
 
 type ShellState =
@@ -47,9 +48,7 @@ export default function App() {
           <Wizard onConfigured={() => setState({ kind: "ready" })} />
         )}
 
-        {state.kind === "ready" && (
-          <p className="text-slate-600">El dashboard se agrega en la Task 12.</p>
-        )}
+        {state.kind === "ready" && <AppShell />}
       </main>
     </div>
   );

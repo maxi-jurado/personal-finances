@@ -110,12 +110,12 @@ dashboard. Si ya está configurado, se salta siempre.
 monedas (D10).
 
 **Acceptance criteria:**
-- [ ] Se crea income en CLP, JPY o USD y aparece en la lista
-- [ ] Validación de moneda y monto (`Decimal`)
+- [x] Se crea income en CLP, JPY o USD y aparece en la lista
+- [x] Validación de moneda y monto (`Decimal`)
 
 **Verification:**
-- [ ] `pytest` de income CRUD pasa
-- [ ] Manual: crear y ver un ingreso USD desde la UI
+- [x] `pytest` de income CRUD pasa
+- [x] Manual: crear y ver un ingreso USD desde la UI
 
 **Dependencies:** Task 5
 **Files:** `backend/app/routers/income.py`, `frontend/src/pages/Income.tsx`, `frontend/src/api/income.ts`
