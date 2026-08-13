@@ -142,12 +142,12 @@ las 2 tarjetas.
 ICOCA como gasto (D12).
 
 **Acceptance criteria:**
-- [ ] Se crea gasto mensual en cualquiera de las 3 monedas
-- [ ] Categoría texto libre (D2)
+- [x] Se crea gasto mensual en cualquiera de las 3 monedas
+- [x] Categoría texto libre (D2)
 
 **Verification:**
-- [ ] `pytest` de monthly-expenses pasa
-- [ ] Manual: crear gasto "ICOCA" en JPY
+- [x] `pytest` de monthly-expenses pasa
+- [x] Manual: crear gasto "ICOCA" en JPY
 
 **Dependencies:** Task 5
 **Files:** `backend/app/routers/monthly_expenses.py`, `frontend/src/pages/MonthlyExpenses.tsx`, `frontend/src/api/monthlyExpenses.ts`

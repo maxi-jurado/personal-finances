@@ -13,7 +13,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.routers import card_expenses, cards, config, exchange_rates, income
+from app.routers import (
+    card_expenses,
+    cards,
+    config,
+    exchange_rates,
+    income,
+    monthly_expenses,
+)
 
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:7413")
 
@@ -40,6 +47,7 @@ app.include_router(exchange_rates.router)
 app.include_router(income.router)
 app.include_router(cards.router)
 app.include_router(card_expenses.router)
+app.include_router(monthly_expenses.router)
 
 
 @app.get("/api/health", tags=["health"])
