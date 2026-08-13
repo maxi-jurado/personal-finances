@@ -126,12 +126,12 @@ monedas (D10).
 las 2 tarjetas.
 
 **Acceptance criteria:**
-- [ ] Se registra gasto contra `card_id` válido; `amount_clp` en CLP
-- [ ] `card_id` inexistente → 404
+- [x] Se registra gasto contra `card_id` válido; `amount_clp` en CLP
+- [x] `card_id` inexistente → 404
 
 **Verification:**
-- [ ] `pytest` de card-expenses pasa
-- [ ] Manual: agregar gasto a Tarjeta 1 y Tarjeta 2
+- [x] `pytest` de card-expenses pasa
+- [x] Manual: agregar gasto a Tarjeta 1 y Tarjeta 2
 
 **Dependencies:** Task 5
 **Files:** `backend/app/routers/card_expenses.py`, `frontend/src/pages/CardExpenses.tsx`, `frontend/src/api/cardExpenses.ts`

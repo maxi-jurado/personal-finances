@@ -15,6 +15,7 @@ const CURRENCY_LABELS: Record<Currency, string> = {
 
 export default function Wizard({ onConfigured }: WizardProps) {
   const [selected, setSelected] = useState<Set<Currency>>(new Set());
+  const [base, setBase] = useState<Currency | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,20 +26,22 @@ export default function Wizard({ onConfigured }: WizardProps) {
       else next.add(currency);
       return next;
     });
+    // Si se deselecciona la moneda base, hay que volver a elegirla.
+    setBase((prev) => (prev === currency ? null : prev));
   };
 
-  const canSubmit = selected.size >= 2 && !saving;
+  // Monedas elegidas en orden canónico, para mostrar la base de forma estable.
+  const chosen = CURRENCIES.filter((c) => selected.has(c));
+  const canSubmit = chosen.length >= 2 && base !== null && !saving;
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!canSubmit) return;
+    if (!canSubmit || base === null) return;
 
     setSaving(true);
     setError(null);
     try {
-      // Se envía en el orden canónico de CURRENCIES para un base_currency estable.
-      const currencies = CURRENCIES.filter((c) => selected.has(c));
-      await saveConfig({ currencies });
+      await saveConfig({ currencies: chosen, base_currency: base });
       onConfigured();
     } catch (err: unknown) {
       const message =
@@ -75,6 +78,34 @@ export default function Wizard({ onConfigured }: WizardProps) {
           </label>
         ))}
       </fieldset>
+
+      {chosen.length >= 2 && (
+        <fieldset className="mt-6">
+          <legend className="text-sm font-medium text-slate-700">
+            ¿Cuál es tu moneda base?
+          </legend>
+          <p className="mt-1 text-sm text-slate-500">
+            Es la referencia principal para mostrar tus balances.
+          </p>
+          <div className="mt-2 space-y-2">
+            {chosen.map((currency) => (
+              <label
+                key={currency}
+                className="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 hover:border-slate-300"
+              >
+                <input
+                  type="radio"
+                  name="base_currency"
+                  className="h-4 w-4"
+                  checked={base === currency}
+                  onChange={() => setBase(currency)}
+                />
+                <span className="text-sm text-slate-700">{CURRENCY_LABELS[currency]}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
 
       {error && (
         <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
