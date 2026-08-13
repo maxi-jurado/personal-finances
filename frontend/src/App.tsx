@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 
-import { api, ApiError } from "./api/client";
-
-interface ConfigStatus {
-  configured: boolean;
-}
+import { ApiError } from "./api/client";
+import { getConfig } from "./api/config";
+import Wizard from "./pages/Wizard";
 
 type ShellState =
   | { kind: "loading" }
@@ -16,8 +14,7 @@ export default function App() {
   const [state, setState] = useState<ShellState>({ kind: "loading" });
 
   useEffect(() => {
-    api
-      .get<ConfigStatus>("/config")
+    getConfig()
       .then((cfg) => setState({ kind: cfg.configured ? "ready" : "unconfigured" }))
       .catch((err: unknown) => {
         const message =
@@ -47,9 +44,7 @@ export default function App() {
         )}
 
         {state.kind === "unconfigured" && (
-          <p className="text-slate-600">
-            Configuración pendiente — el wizard se agrega en la Task 5.
-          </p>
+          <Wizard onConfigured={() => setState({ kind: "ready" })} />
         )}
 
         {state.kind === "ready" && (

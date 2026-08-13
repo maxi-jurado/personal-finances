@@ -1,0 +1,94 @@
+import { useState } from "react";
+
+import { ApiError } from "../api/client";
+import { CURRENCIES, Currency, saveConfig } from "../api/config";
+
+interface WizardProps {
+  onConfigured: () => void;
+}
+
+const CURRENCY_LABELS: Record<Currency, string> = {
+  CLP: "Peso chileno (CLP)",
+  JPY: "Yen japonés (JPY)",
+  USD: "Dólar estadounidense (USD)",
+};
+
+export default function Wizard({ onConfigured }: WizardProps) {
+  const [selected, setSelected] = useState<Set<Currency>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const toggle = (currency: Currency) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(currency)) next.delete(currency);
+      else next.add(currency);
+      return next;
+    });
+  };
+
+  const canSubmit = selected.size >= 2 && !saving;
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!canSubmit) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      // Se envía en el orden canónico de CURRENCIES para un base_currency estable.
+      const currencies = CURRENCIES.filter((c) => selected.has(c));
+      await saveConfig({ currencies });
+      onConfigured();
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : "No se pudo guardar la configuración.";
+      setError(message);
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="max-w-md">
+      <h2 className="text-xl font-semibold text-slate-800">
+        ¿Cuáles son tus monedas principales?
+      </h2>
+      <p className="mt-1 text-sm text-slate-500">
+        Selecciona al menos 2. Podrás registrar movimientos en cualquiera de ellas.
+      </p>
+
+      <fieldset className="mt-4 space-y-2">
+        {CURRENCIES.map((currency) => (
+          <label
+            key={currency}
+            className="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 hover:border-slate-300"
+          >
+            <input
+              type="checkbox"
+              className="h-4 w-4"
+              checked={selected.has(currency)}
+              onChange={() => toggle(currency)}
+            />
+            <span className="text-sm text-slate-700">{CURRENCY_LABELS[currency]}</span>
+          </label>
+        ))}
+      </fieldset>
+
+      {error && (
+        <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          {error}
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={!canSubmit}
+        className="mt-6 rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+      >
+        {saving ? "Guardando…" : "Continuar"}
+      </button>
+    </form>
+  );
+}

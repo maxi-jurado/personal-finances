@@ -15,13 +15,13 @@
 antes de escribir lógica.
 
 **Acceptance criteria:**
-- [ ] Estructura `backend/app/{routers,services}`, `backend/{scripts,tests}`, `frontend/src/{components,pages,api}` existe
-- [ ] `.gitignore` incluye `*.db *.sqlite *.sqlite3 .env __pycache__/ node_modules/`
-- [ ] `.env.example` documenta `BACKEND_PORT=7412`, `FRONTEND_PORT=7413`
+- [x] Estructura `backend/app/{routers,services}`, `backend/{scripts,tests}`, `frontend/src/{components,pages,api}` existe
+- [x] `.gitignore` incluye `*.db *.sqlite *.sqlite3 .env __pycache__/ node_modules/`
+- [x] `.env.example` documenta `BACKEND_PORT=7412`, `FRONTEND_PORT=7413`
 
 **Verification:**
-- [ ] `git status` no muestra `.env` ni `*.db` como trackeables
-- [ ] Manual: árbol de carpetas coincide con el spec
+- [x] `git status` no muestra `.env` ni `*.db` como trackeables
+- [x] Manual: árbol de carpetas coincide con el spec
 
 **Dependencies:** None
 **Files:** `.gitignore`, `.env.example`, `backend/requirements.txt`, dirs
@@ -33,13 +33,13 @@ existe), `models.py` (todas las tablas + enum `Currency`), seed de las 2
 `credit_cards` (Tarjeta 1 / Tarjeta 2) al inicializar. Montos con `Numeric`.
 
 **Acceptance criteria:**
-- [ ] Todas las tablas del spec creadas vía ORM; montos `Numeric`, no `Float`
-- [ ] `Currency` enum restringe a {CLP, JPY, USD}
-- [ ] Al primer arranque se crean exactamente 2 filas en `credit_cards`
+- [x] Todas las tablas del spec creadas vía ORM; montos `Numeric`, no `Float`
+- [x] `Currency` enum restringe a {CLP, JPY, USD}
+- [x] Al primer arranque se crean exactamente 2 filas en `credit_cards`
 
 **Verification:**
-- [ ] `pytest` de creación de schema en SQLite temporal pasa
-- [ ] Manual: arrancar backend crea `finanzas.db` con las tablas
+- [x] `pytest` de creación de schema en SQLite temporal pasa
+- [x] Manual: arrancar backend crea `finanzas.db` con las tablas
 
 **Dependencies:** Task 1
 **Files:** `backend/app/database.py`, `backend/app/models.py`, `backend/app/schemas.py`
@@ -52,13 +52,13 @@ helpers de conversión para CLP↔JPY, USD↔JPY, USD↔CLP. Endpoint
 `GET /api/exchange-rates/latest`. Si el fetch falla, sirve la última tasa cacheada.
 
 **Acceptance criteria:**
-- [ ] No se llama la API si ya hay tasa del día en cache
-- [ ] Las 3 conversiones se derivan de la respuesta base USD
-- [ ] `GET /api/exchange-rates/latest` devuelve las tasas vigentes
+- [x] No se llama la API si ya hay tasa del día en cache
+- [x] Las 3 conversiones se derivan de la respuesta base USD
+- [x] `GET /api/exchange-rates/latest` devuelve las tasas vigentes
 
 **Verification:**
-- [ ] `pytest` de conversiones con fixture (sin red) pasa
-- [ ] Manual: 1ª llamada puebla cache, 2ª no re-llama la API
+- [x] `pytest` de conversiones con fixture (sin red) pasa
+- [x] Manual: 1ª llamada puebla cache, 2ª no re-llama la API
 
 **Dependencies:** Task 2
 **Files:** `backend/app/services/exchange_rates.py`, `backend/app/routers/exchange_rates.py`, `backend/app/main.py`
@@ -69,13 +69,13 @@ helpers de conversión para CLP↔JPY, USD↔JPY, USD↔CLP. Endpoint
 en `src/api/`, app shell con routing y detección de estado de config.
 
 **Acceptance criteria:**
-- [ ] `npm run build` compila sin errores de TS
-- [ ] Cliente API tipado apunta a `/api` (proxy)
-- [ ] Tailwind aplica estilos en el shell
+- [x] `npm run build` compila sin errores de TS
+- [x] Cliente API tipado apunta a `/api` (proxy)
+- [x] Tailwind aplica estilos en el shell
 
 **Verification:**
-- [ ] `npm run build` OK
-- [ ] Manual: `npm run dev` renderiza el shell
+- [x] `npm run build` OK
+- [x] Manual: `npm run dev` renderiza el shell
 
 **Dependencies:** Task 1
 **Files:** `frontend/{package.json,vite.config.ts,tailwind.config.js}`, `frontend/src/{main.tsx,App.tsx,api/client.ts}`
@@ -93,13 +93,13 @@ wizard de un paso con checkboxes CLP/JPY/USD (mín. 2), guarda y redirige al
 dashboard. Si ya está configurado, se salta siempre.
 
 **Acceptance criteria:**
-- [ ] `GET /api/config` sin config → `{"configured": false}`
-- [ ] Wizard exige ≥2 monedas y solo permite CLP/JPY/USD
-- [ ] Tras `POST`, no reaparece el wizard
+- [x] `GET /api/config` sin config → `{"configured": false}`
+- [x] Wizard exige ≥2 monedas y solo permite CLP/JPY/USD
+- [x] Tras `POST`, no reaparece el wizard
 
 **Verification:**
-- [ ] `pytest` de config (sin/una/con config) pasa
-- [ ] Manual: DB fresca → wizard → dashboard; recarga no vuelve al wizard
+- [x] `pytest` de config (sin/una/con config) pasa
+- [x] Manual: DB fresca → wizard → dashboard; recarga no vuelve al wizard
 
 **Dependencies:** Tasks 2, 4
 **Files:** `backend/app/routers/config.py`, `backend/app/schemas.py`, `frontend/src/pages/Wizard.tsx`, `frontend/src/api/config.ts`
