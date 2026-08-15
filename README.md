@@ -1,5 +1,7 @@
 # Finanzas Personales — CLP · JPY · USD
 
+**Español** · [English](README.en.md)
+
 App **local, de un solo usuario**, para controlar finanzas moviéndose entre tres
 monedas: peso chileno (**CLP**), yen japonés (**JPY**) y dólar (**USD**). Pensada
 para alguien que vive en Japón con ingresos y gastos repartidos en las tres.
