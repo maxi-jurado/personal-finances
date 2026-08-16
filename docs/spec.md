@@ -68,7 +68,9 @@ monedas, con conversiones correctas contra la API real de tipo de cambio.
   guarda un snapshot diario para trazabilidad, pero la consolidación no hace
   conversión histórica por fecha de cada movimiento.
 - **D2 — Categorías:** campo `category` es **texto libre** (string). Sin tabla
-  ni enum. El seed usa un set realista.
+  ni enum. El seed usa un set realista. **Enmendada por D16** para
+  `monthly_expenses`/`card_expenses` (pasan a FK a `categories`); sigue vigente
+  tal cual para `income`.
 - **D3 — Montos nativos:** cada monto se guarda en su moneda nativa; la
   conversión a las 3 monedas ocurre **solo al mostrar** (summary/dashboard).
 - **D4 — Precisión monetaria:** se usa `Numeric`/`Decimal` en SQLAlchemy,
@@ -85,9 +87,10 @@ monedas, con conversiones correctas contra la API real de tipo de cambio.
 config            (id, currencies_json, base_currency, created_at)
 exchange_rates    (id, date, base_currency, target_currency, rate, fetched_at)
 income            (id, date, description, category, currency, amount, notes)
+categories        (id, name)                      -- D16; usada por monthly_expenses/card_expenses
 credit_cards      (id, name)                     -- exactamente 2 filas: Tarjeta 1 / Tarjeta 2
-card_expenses     (id, card_id FK, date, description, category, amount_clp, notes)
-monthly_expenses  (id, date, description, category, currency, amount, notes)
+card_expenses     (id, card_id FK, date, description, category_id FK, amount_clp, notes)
+monthly_expenses  (id, date, description, category_id FK, currency, amount, notes)
 fixed_expenses    (id, concept, currency, amount, payment_day, notes)
 transfers         (id, date, jpy_requested, clp_charged, effective_rate, notes)
 ```
@@ -96,6 +99,7 @@ Notas:
 - `currency` restringido a `{CLP, JPY, USD}` (validación Pydantic / enum de app).
 - `card_expenses.amount_clp`: los gastos de tarjeta chilena vienen en CLP.
 - `transfers.effective_rate` se computa, no se ingresa (D6).
+- `monthly_expenses.category_id` / `card_expenses.category_id` → FK a `categories` (D16, enmienda D2 solo para estos dos modelos). `income.category` sigue siendo texto libre (D2 vigente).
 
 ## API — Endpoints v1
 
@@ -103,6 +107,7 @@ Notas:
 GET/POST   /api/config
 GET        /api/exchange-rates/latest
 GET/POST   /api/income
+GET/POST/PATCH/DELETE  /api/categories, /api/categories/{id}         -- D16
 GET/POST   /api/card-expenses/{card_id}
 GET/POST   /api/monthly-expenses
 GET/POST   /api/fixed-expenses
@@ -300,3 +305,13 @@ funciones y módulos pequeños y con una responsabilidad.
   recurrente en un valor aproximado más exacto) se define en un spec aparte; no
   se implementa en v1. Requiere ampliar el alcance de unidades (ver Boundaries:
   "Ask first").
+- **D16 — Tabla `categories` (enmienda D2 para gastos):** `monthly_expenses` y
+  `card_expenses` dejan de usar `category` como texto libre y pasan a
+  `category_id` (FK a `categories`, tabla nueva con `id, name` únicos). CRUD
+  completo de categorías desde la v1 de esta ampliación (crear/listar/editar/
+  borrar), con borrado bloqueado (409) si la categoría está en uso por algún
+  gasto. `income.category` **no** se toca — sigue como texto libre bajo D2,
+  porque sus categorías (Salario, Freelance) son de otra naturaleza que las de
+  gasto (Alimentación, Transporte, etc.). Set inicial sembrado por migración:
+  Alimentación, Entretenimiento, Estilo de Vida, Gustos Personales, Aseo y
+  Limpieza, Transporte, Salud, Vivienda y Servicios.

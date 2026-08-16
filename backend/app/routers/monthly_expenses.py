@@ -1,7 +1,7 @@
 """Router de gastos mensuales (monthly-expenses). Soporta las 3 monedas.
 
 Aquí se registra la recarga ICOCA como un gasto más (D12); la categoría es
-texto libre (D2).
+una FK a `categories` (D16).
 """
 
 from __future__ import annotations
@@ -9,12 +9,12 @@ from __future__ import annotations
 from datetime import date as date_type
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Currency, MonthlyExpense
+from app.models import Category, Currency, MonthlyExpense
 from app.schemas import ORMModel
 
 router = APIRouter(prefix="/api/monthly-expenses", tags=["monthly-expenses"])
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/monthly-expenses", tags=["monthly-expenses"])
 class MonthlyExpenseCreate(BaseModel):
     date: date_type
     description: str = Field(min_length=1)
-    category: str = Field(min_length=1)
+    category_id: int
     currency: Currency
     amount: Decimal = Field(gt=0)
     notes: str | None = None
@@ -33,10 +33,18 @@ class MonthlyExpenseRead(ORMModel):
     id: int
     date: date_type
     description: str
-    category: str
+    category_id: int
+    category_name: str
     currency: Currency
     amount: Decimal
     notes: str | None = None
+
+
+def _require_category(category_id: int, db: Session) -> Category:
+    category = db.get(Category, category_id)
+    if category is None:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada.")
+    return category
 
 
 @router.get("", response_model=list[MonthlyExpenseRead])
@@ -52,6 +60,7 @@ def list_monthly_expenses(db: Session = Depends(get_db)) -> list[MonthlyExpense]
 def create_monthly_expense(
     payload: MonthlyExpenseCreate, db: Session = Depends(get_db)
 ) -> MonthlyExpense:
+    _require_category(payload.category_id, db)
     row = MonthlyExpense(**payload.model_dump())
     db.add(row)
     db.commit()

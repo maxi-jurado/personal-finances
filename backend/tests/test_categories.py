@@ -1,8 +1,7 @@
-"""Tests de categorías de gasto (Task 18).
+"""Tests de categorías de gasto (Task 18-19).
 
 CRUD completo: nombre único, 404 sobre id inexistente, 409 sobre nombre
-duplicado. El bloqueo de borrado por categoría en uso se prueba en la tarea
-que introduce `category_id` en monthly_expenses/card_expenses (Task 19).
+duplicado, y 409 al borrar una categoría referenciada por algún gasto.
 """
 
 from __future__ import annotations
@@ -84,3 +83,35 @@ def test_borra_categoria(client):
 def test_borra_categoria_inexistente_404(client):
     resp = client.delete("/api/categories/9999")
     assert resp.status_code == 404
+
+
+def test_borra_categoria_en_uso_por_gasto_mensual_409(client):
+    category = client.post("/api/categories", json=_payload()).json()
+    client.post(
+        "/api/monthly-expenses",
+        json={
+            "date": "2026-08-05",
+            "description": "Super",
+            "category_id": category["id"],
+            "currency": "JPY",
+            "amount": "1000",
+        },
+    )
+    resp = client.delete(f"/api/categories/{category['id']}")
+    assert resp.status_code == 409
+
+
+def test_borra_categoria_en_uso_por_gasto_de_tarjeta_409(client):
+    category = client.post("/api/categories", json=_payload()).json()
+    card_id = client.get("/api/credit-cards").json()[0]["id"]
+    client.post(
+        f"/api/card-expenses/{card_id}",
+        json={
+            "date": "2026-08-05",
+            "description": "Compra",
+            "category_id": category["id"],
+            "amount_clp": "1000",
+        },
+    )
+    resp = client.delete(f"/api/categories/{category['id']}")
+    assert resp.status_code == 409

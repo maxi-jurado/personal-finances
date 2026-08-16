@@ -95,11 +95,16 @@ class CardExpense(Base):
     card_id: Mapped[int] = mapped_column(ForeignKey("credit_cards.id"), nullable=False, index=True)
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     description: Mapped[str] = mapped_column(String, nullable=False)
-    category: Mapped[str] = mapped_column(String, nullable=False)
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), nullable=False, index=True)
     amount_clp: Mapped[Decimal] = mapped_column(_MONEY, nullable=False)
     notes: Mapped[str | None] = mapped_column(String, nullable=True)
 
     card: Mapped["CreditCard"] = relationship(back_populates="expenses")
+    category: Mapped["Category"] = relationship()
+
+    @property
+    def category_name(self) -> str:
+        return self.category.name
 
 
 class MonthlyExpense(Base):
@@ -108,10 +113,16 @@ class MonthlyExpense(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     description: Mapped[str] = mapped_column(String, nullable=False)
-    category: Mapped[str] = mapped_column(String, nullable=False)
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), nullable=False, index=True)
     currency: Mapped[Currency] = _currency_col(nullable=False)
     amount: Mapped[Decimal] = mapped_column(_MONEY, nullable=False)
     notes: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    category: Mapped["Category"] = relationship()
+
+    @property
+    def category_name(self) -> str:
+        return self.category.name
 
 
 class FixedExpense(Base):

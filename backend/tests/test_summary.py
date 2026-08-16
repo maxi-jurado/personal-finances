@@ -28,6 +28,12 @@ def rates(db):
     fx._store_rates(db, date.today(), dict(RATES))
 
 
+@pytest.fixture()
+def category_id(client) -> int:
+    resp = client.post("/api/categories", json={"name": "Varios"})
+    return resp.json()["id"]
+
+
 def _dec(value) -> Decimal:
     return Decimal(str(value))
 
@@ -45,7 +51,7 @@ def test_mes_sin_datos_da_ceros(client, rates):
             assert _dec(body[bucket][cur]) == Decimal("0")
 
 
-def test_saldo_nativo_por_moneda(client, rates):
+def test_saldo_nativo_por_moneda(client, rates, category_id):
     # Sueldo 2 USD; gasto de tarjeta 900 CLP.
     client.post(
         "/api/income",
@@ -53,7 +59,7 @@ def test_saldo_nativo_por_moneda(client, rates):
     )
     client.post(
         "/api/card-expenses/1",
-        json={"date": "2026-08-10", "description": "Compra", "category": "Varios", "amount_clp": "900"},
+        json={"date": "2026-08-10", "description": "Compra", "category_id": category_id, "amount_clp": "900"},
     )
 
     body = client.get("/api/summary?month=2026-08").json()
@@ -102,14 +108,14 @@ def test_gasto_fijo_cuenta_en_cualquier_mes(client, rates):
         assert _dec(body["balance"]["USD"]) == Decimal("-10")
 
 
-def test_card_debt_por_tarjeta(client, rates):
+def test_card_debt_por_tarjeta(client, rates, category_id):
     client.post(
         "/api/card-expenses/1",
-        json={"date": "2026-08-02", "description": "A", "category": "x", "amount_clp": "900"},
+        json={"date": "2026-08-02", "description": "A", "category_id": category_id, "amount_clp": "900"},
     )
     client.post(
         "/api/card-expenses/2",
-        json={"date": "2026-08-03", "description": "B", "category": "y", "amount_clp": "1800"},
+        json={"date": "2026-08-03", "description": "B", "category_id": category_id, "amount_clp": "1800"},
     )
 
     cards = client.get("/api/summary?month=2026-08").json()["cards"]

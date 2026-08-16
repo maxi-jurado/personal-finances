@@ -26,6 +26,7 @@ import json  # noqa: E402
 from app.database import SessionLocal, init_db  # noqa: E402
 from app.models import (  # noqa: E402
     CardExpense,
+    Category,
     Config,
     CreditCard,
     Currency,
@@ -45,7 +46,21 @@ DEMO_RATES = {
 }
 _RATE_QUANTUM = Decimal("0.000001")
 
+# Categorías (D16). Igual set que la migración 0002; se re-declara acá para
+# que `seed_demo.py` funcione también sin haber corrido Alembic todavía.
+_CATEGORY_NAMES = [
+    "Alimentación",
+    "Entretenimiento",
+    "Estilo de Vida",
+    "Gustos Personales",
+    "Aseo y Limpieza",
+    "Transporte",
+    "Salud",
+    "Vivienda y Servicios",
+]
+
 # Tablas de movimientos que el seed reemplaza por completo (idempotencia).
+# `Category` queda afuera: es dato de referencia, sobrevive a los reseeds.
 _MOVEMENT_MODELS = (
     Income,
     CardExpense,
@@ -83,6 +98,19 @@ def _wipe(db) -> None:
     db.commit()
 
 
+def _ensure_categories(db) -> dict[str, int]:
+    """Lookup-or-create de las categorías demo. No se wipea entre reseeds."""
+    existing = {c.name: c.id for c in db.query(Category).all()}
+    for name in _CATEGORY_NAMES:
+        if name not in existing:
+            category = Category(name=name)
+            db.add(category)
+            db.flush()
+            existing[name] = category.id
+    db.commit()
+    return existing
+
+
 def _seed_config(db) -> None:
     db.add(
         Config(
@@ -109,20 +137,20 @@ def _seed_fixed_expenses(db) -> None:
     db.commit()
 
 
-def _seed_monthly(db, months: list[date]) -> None:
+def _seed_monthly(db, months: list[date], categories: dict[str, int]) -> None:
     for i, m in enumerate(months):
         supermercado = Decimal("42000") + Decimal(1500) * i
         db.add_all(
             [
                 Income(date=_on(m, 25), description="Sueldo Japón", category="Salario", currency=Currency.JPY, amount=Decimal("285000")),
                 Income(date=_on(m, 5), description="Honorarios Chile", category="Freelance", currency=Currency.CLP, amount=Decimal("450000")),
-                MonthlyExpense(date=_on(m, 3), description="Recarga ICOCA", category="ICOCA", currency=Currency.JPY, amount=Decimal("3000")),
-                MonthlyExpense(date=_on(m, 8), description="Supermercado", category="Comida", currency=Currency.JPY, amount=supermercado),
-                MonthlyExpense(date=_on(m, 22), description="Supermercado", category="Comida", currency=Currency.JPY, amount=Decimal("18000")),
-                MonthlyExpense(date=_on(m, 18), description="Farmacia", category="Salud", currency=Currency.JPY, amount=Decimal("6200")),
-                CardExpense(card_id=1, date=_on(m, 12), description="Compras online", category="Varios", amount_clp=Decimal("65000")),
-                CardExpense(card_id=1, date=_on(m, 20), description="Restaurant", category="Comida", amount_clp=Decimal("32000") + Decimal(2000) * i),
-                CardExpense(card_id=2, date=_on(m, 15), description="Pasajes", category="Transporte", amount_clp=Decimal("89000")),
+                MonthlyExpense(date=_on(m, 3), description="Recarga ICOCA", category_id=categories["Transporte"], currency=Currency.JPY, amount=Decimal("3000")),
+                MonthlyExpense(date=_on(m, 8), description="Supermercado", category_id=categories["Alimentación"], currency=Currency.JPY, amount=supermercado),
+                MonthlyExpense(date=_on(m, 22), description="Supermercado", category_id=categories["Alimentación"], currency=Currency.JPY, amount=Decimal("18000")),
+                MonthlyExpense(date=_on(m, 18), description="Farmacia", category_id=categories["Salud"], currency=Currency.JPY, amount=Decimal("6200")),
+                CardExpense(card_id=1, date=_on(m, 12), description="Compras online", category_id=categories["Estilo de Vida"], amount_clp=Decimal("65000")),
+                CardExpense(card_id=1, date=_on(m, 20), description="Restaurant", category_id=categories["Alimentación"], amount_clp=Decimal("32000") + Decimal(2000) * i),
+                CardExpense(card_id=2, date=_on(m, 15), description="Pasajes", category_id=categories["Transporte"], amount_clp=Decimal("89000")),
             ]
         )
         # Ingreso ocasional en USD algunos meses.
@@ -147,12 +175,14 @@ def seed(months: int = 5) -> None:
     init_db()  # asegura schema + las 2 tarjetas
     with SessionLocal() as db:
         _wipe(db)
+        categories = _ensure_categories(db)
         _seed_config(db)
         _seed_rates(db)
         _seed_fixed_expenses(db)
-        _seed_monthly(db, _recent_months(months))
+        _seed_monthly(db, _recent_months(months), categories)
 
         counts = {
+            "categories": db.query(Category).count(),
             "income": db.query(Income).count(),
             "monthly_expenses": db.query(MonthlyExpense).count(),
             "card_expenses": db.query(CardExpense).count(),

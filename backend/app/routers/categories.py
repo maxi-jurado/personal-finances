@@ -2,8 +2,7 @@
 
 CRUD completo. El borrado se bloquea (409) si la categoría está referenciada
 por algún gasto — chequeo a nivel de aplicación, ya que SQLite no tiene FK
-enforcement activado en este proyecto. Ese chequeo se agrega en la tarea que
-introduce la FK `category_id` en los modelos de gasto.
+enforcement activado en este proyecto.
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Category
+from app.models import CardExpense, Category, MonthlyExpense
 from app.schemas import CategoryRead
 
 router = APIRouter(prefix="/api/categories", tags=["categories"])
@@ -69,8 +68,16 @@ def update_category(
     return category
 
 
+def _in_use(category_id: int, db: Session) -> bool:
+    in_monthly = db.query(MonthlyExpense).filter(MonthlyExpense.category_id == category_id).first()
+    in_cards = db.query(CardExpense).filter(CardExpense.category_id == category_id).first()
+    return in_monthly is not None or in_cards is not None
+
+
 @router.delete("/{category_id}", status_code=204)
 def delete_category(category_id: int, db: Session = Depends(get_db)) -> None:
     category = _require_category(category_id, db)
+    if _in_use(category_id, db):
+        raise HTTPException(status_code=409, detail="La categoría está en uso por algún gasto.")
     db.delete(category)
     db.commit()
