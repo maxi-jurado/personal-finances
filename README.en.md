@@ -15,17 +15,30 @@ so code quality, tests and documentation matter as much as it working.
 
 ## What it does
 
-- **First-run wizard**: pick your main currencies (min. 2 of CLP/JPY/USD) once.
+- **First-run wizard** (2 steps): pick your main currencies (min. 2 of
+  CLP/JPY/USD), then register your first card. If you close it halfway
+  through, it resumes where you left off.
+- **Credit cards**: you define them yourself (name, currency, credit limit),
+  with no limit on how many. **Available credit** is computed automatically
+  (`limit − expenses + payments`); cards are deactivated instead of deleted
+  (a deactivated card rejects new expenses but still accepts payments and
+  keeps its history).
+- **Expense categories**: your own catalog with full CRUD (create, edit,
+  delete), shared between monthly and card expenses. A category in use by
+  existing expenses can't be deleted.
 - **Movement CRUD**:
   - **Income** in any of the 3 currencies.
-  - **Card expenses** (2 Chilean credit cards, in CLP).
-  - **Monthly expenses** (includes the ICOCA top-up as just another expense).
+  - **Card expenses**, in the currency of the chosen card.
+  - **Monthly expenses** (includes the ICOCA top-up as just another expense),
+    with a `paid`/`voided` **status** instead of deletion — a voided expense
+    doesn't count toward the balance, but the record is never lost.
+    Combinable filters by text, category, date or month, and status.
   - **Fixed expenses**, recurring (rent, loans, subscriptions) with a payment day.
   - **Money withdrawals** CLP→JPY: you record the JPY received and the CLP the
     bank charged you; the **effective rate** is computed for you.
 - **Monthly dashboard** with a **native balance per currency** (green if positive,
   red if negative), the **total equivalent** converted to all 3 currencies, and
-  **each card's debt** shown separately, in red.
+  **each card's debt** shown separately, in its own currency.
 - **Currency conversion** from **one** daily call to a public rates API (USD
   base), cached once a day. Amounts are stored in their native currency and
   converted only for display.
@@ -40,18 +53,25 @@ All money is handled with `Decimal`/`Numeric` (never `float`).
 |---|---|
 | ![Dashboard](docs/img/dashboard.png) | ![Money withdrawal](docs/img/retiro.png) |
 
-_To regenerate them: bring the app up with demo data (`./deploy.sh`) and save the
-screenshots to `docs/img/`._
+_To regenerate them: bring the app up with demo data (`./deploy.sh demo`) and
+save the screenshots to `docs/img/`._
 
 ## Running the app
 
 ### Recommended: `deploy.sh`
 
-A single command builds, brings up and opens a live console. If the database is
-empty, it creates demo data automatically.
+A single command builds, brings up and opens a live console — in **production
+mode**: it creates the database if missing, but never seeds it with demo data.
 
 ```bash
 ./deploy.sh
+```
+
+To bring it up with fictitious demo data (only if the database is empty; it
+never overwrites real data), use `demo`:
+
+```bash
+./deploy.sh demo
 ```
 
 In the live console:
@@ -62,10 +82,7 @@ In the live console:
 Other commands:
 
 ```bash
-./deploy.sh up --no-seed   # bring up without creating demo data (for real use)
-./deploy.sh up --seed      # force-reload the demo data (replaces it)
-./deploy.sh up --detach    # bring up and exit (no live console)
-./deploy.sh seed           # seed demo data into an already-running backend
+./deploy.sh --detach       # bring up and exit (no live console); combinable with demo
 ./deploy.sh down           # stop and remove the containers
 ./deploy.sh logs           # follow the logs
 ./deploy.sh status         # service status
@@ -89,6 +106,7 @@ Backend (from `backend/`, with a venv in `backend/.venv`):
 
 ```bash
 .venv/bin/python -m pip install -r requirements.txt
+.venv/bin/alembic upgrade head    # optional on a fresh DB; seeds the starter categories
 .venv/bin/python -m uvicorn app.main:app --reload --port 7412
 ```
 
@@ -138,16 +156,18 @@ docker compose exec backend python scripts/seed_demo.py
 backend/
   app/
     main.py            # FastAPI entrypoint + CORS
-    models.py          # ORM models (Numeric for money, Currency enum)
-    routers/           # config, income, card/monthly/fixed expenses, transfers, summary…
-    services/          # exchange_rates.py, summary.py
+    models.py          # ORM models (Numeric for money, Currency/ExpenseStatus/CardStatus enums)
+    routers/           # config, categories, credit-cards, card-expenses, card-payments,
+                        # monthly/fixed expenses, income, transfers, summary…
+    services/          # exchange_rates.py, cards.py (available credit), summary.py
+  alembic/{env.py,versions/}   # schema migrations
   scripts/seed_demo.py
   tests/               # pytest (temp SQLite, never the real DB)
-  Dockerfile
+  Dockerfile           # runs `alembic upgrade head` before uvicorn
 frontend/
-  src/{api,components,pages,lib}/
+  src/{api,components,pages,lib}/   # Cards.tsx, Categories.tsx, MonthlyExpenses.tsx (filters)…
   Dockerfile · nginx.conf
-docs/spec.md           # v1 spec + decisions D1–D14
+docs/spec.md           # v1 spec + decisions D1–D18
 tasks/                 # plan and progress
 deploy.sh · docker-compose.yml
 ```
@@ -159,8 +179,11 @@ cd backend && .venv/bin/python -m pytest
 ```
 
 Prioritizes the 3 currency conversions, the withdrawal effective-rate
-calculation, the consolidation endpoint (`/api/summary`) and the config/wizard
-flow. Tests use a temporary SQLite and never touch the network or `finanzas.db`.
+calculation, the consolidation endpoint (`/api/summary`), the config/wizard
+flow, category and card CRUD (including their rules: 409 deleting a category
+in use, 409 spending on a deactivated card, available-credit calculation),
+and that the Alembic migration chain matches the models. Tests use a
+temporary SQLite and never touch the network or `finanzas.db`.
 
 ## Security
 
@@ -171,6 +194,8 @@ flow. Tests use a temporary SQLite and never touch the network or `finanzas.db`.
 
 ## Design and decisions
 
-The details live in [`docs/spec.md`](docs/spec.md), including decisions D1–D14
+The details live in [`docs/spec.md`](docs/spec.md), including decisions D1–D18
 (e.g. **D13**: a withdrawal is a movement between currencies, not an expense;
-**D14**: fixed expenses in UF, deferred to a v2). The spec is written in Spanish.
+**D15**: monthly expenses are voided by status instead of deleted; **D17**:
+card management with dynamic available credit and no limit on how many). The
+spec is written in Spanish.

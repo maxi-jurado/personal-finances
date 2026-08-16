@@ -33,7 +33,7 @@ monedas, con conversiones correctas contra la API real de tipo de cambio.
 - Exactamente CLP, JPY, USD. **No** soporte genérico a monedas arbitrarias.
 - Conversiones CLP↔JPY, USD↔JPY, USD↔CLP, todas derivadas de **una** llamada
   diaria a la API base USD.
-- Wizard de primer arranque (una pantalla).
+- Wizard de primer arranque (dos pasos: monedas y primera tarjeta, D17).
 - CRUD de ingresos, gastos de tarjeta, gastos mensuales, gastos fijos, giros.
 - Summary mensual consolidado en las 3 monedas.
 - `seed_demo.py` con datos ficticios realistas.
@@ -98,9 +98,13 @@ transfers         (id, date, jpy_requested, clp_charged, effective_rate, notes)
 
 Notas:
 - `currency` restringido a `{CLP, JPY, USD}` (validación Pydantic / enum de app).
-- `card_expenses.amount_clp`: los gastos de tarjeta chilena vienen en CLP.
+- `card_expenses.amount` va en la moneda de la tarjeta padre (`card.currency`,
+  D17) — no tiene columna de moneda propia.
 - `transfers.effective_rate` se computa, no se ingresa (D6).
 - `monthly_expenses.category_id` / `card_expenses.category_id` → FK a `categories` (D16, enmienda D2 solo para estos dos modelos). `income.category` sigue siendo texto libre (D2 vigente).
+- `credit_cards.currency`/`credit_limit`/`status` y `card_payments` no existían
+  en v1 — llegan con D17. Ver "Migraciones (Alembic)" para cómo se aplicaron
+  sobre el schema original sin perder datos.
 
 ## API — Endpoints v1
 
@@ -120,14 +124,21 @@ GET/POST   /api/transfers
 GET        /api/summary?month=YYYY-MM      -- balance consolidado del mes en las 3 monedas
 ```
 
-Flujo de primer arranque (wizard):
-1. Al iniciar el backend, si `finanzas.db` no existe → crear schema automáticamente.
+Flujo de primer arranque (wizard, dos pasos — D17):
+1. Al iniciar el backend, si `finanzas.db` no existe → crear schema
+   automáticamente (`create_all`); si es una DB ya migrada por Alembic, no
+   hace nada nuevo (ver "Migraciones (Alembic)").
 2. `GET /api/config` → si no hay config guardada, devuelve `{"configured": false}`.
-3. El frontend, al recibir `configured: false`, muestra un wizard de un paso:
+3. **Paso 1 — monedas:** el frontend, al recibir `configured: false`, muestra
    *"¿Cuáles son tus monedas principales?"* con checkboxes limitados a
-   **CLP / JPY / USD** (mínimo 2 seleccionadas).
-4. `POST /api/config` guarda y redirige al dashboard.
-5. Si la DB ya existe y está configurada, se salta el wizard siempre.
+   **CLP / JPY / USD** (mínimo 2 seleccionadas). `POST /api/config` guarda y
+   avanza al paso 2.
+4. **Paso 2 — primera tarjeta:** pide nombre, moneda y cupo total de al menos
+   una tarjeta (`POST /api/credit-cards`). Al crearla, entra al dashboard.
+5. Si la config existe pero no hay ninguna tarjeta (`GET /api/credit-cards`
+   vacío), el wizard **resume directo en el paso 2** al recargar — no repite
+   la selección de monedas. Si config y al menos una tarjeta existen, el
+   wizard se salta siempre.
 
 ## Estructura del proyecto
 
@@ -140,7 +151,9 @@ finanzas-app/
 │   │   ├── schemas.py
 │   │   ├── database.py
 │   │   ├── routers/
-│   │   └── services/exchange_rates.py
+│   │   └── services/{exchange_rates.py,cards.py,summary.py}
+│   ├── alembic/{env.py,versions/}      -- migraciones (D17)
+│   ├── alembic.ini
 │   ├── scripts/seed_demo.py
 │   ├── tests/
 │   ├── requirements.txt
@@ -169,6 +182,7 @@ Instalar:  pip install -r requirements.txt
 Dev:       uvicorn app.main:app --reload --port 7412
 Test:      pytest
 Seed:      python scripts/seed_demo.py
+Migrar:    alembic upgrade head
 ```
 
 **Frontend** (desde `frontend/`):
@@ -184,6 +198,34 @@ Lint:      npm run lint
 ```
 docker-compose up            # levanta ambos servicios sin pasos manuales
 ```
+
+## Migraciones (Alembic)
+
+El proyecto usó solo `create_all()` hasta D17 (v1 + D15/D16), que crea tablas
+faltantes pero **nunca altera** una tabla existente. Alembic se introdujo para
+poder agregar `status`, `category_id`, y la gestión de tarjetas sin perder
+datos en un `finanzas.db` ya poblado.
+
+- `alembic/env.py` lee `DATABASE_URL` igual que `database.py` (respeta el
+  override que usan los tests).
+- Las migraciones **corren en el entrypoint de Docker**, antes de levantar
+  `uvicorn` (ver `backend/Dockerfile`) — no en el `lifespan` de FastAPI, para
+  que `TestClient`/`conftest.py` no disparen Alembic en cada test. Los tests
+  siguen usando `create_all()` directo sobre un SQLite temporal siempre
+  limpio; `tests/test_migrations.py` es el único que corre la cadena real de
+  Alembic, contra un archivo aparte, y verifica que coincide con los modelos.
+- Comandos típicos (desde `backend/`):
+  ```
+  alembic upgrade head                              # aplica migraciones pendientes
+  alembic revision --autogenerate -m "descripción"   # genera una nueva a partir de cambios en models.py
+  alembic current                                    # revisión actual de la DB
+  ```
+- El `finanzas.db` local que ya existía antes de Alembic no tiene tabla de
+  versiones — el entrypoint hace `alembic upgrade head || (alembic stamp
+  0001 && alembic upgrade head)`: si falla por tablas ya existentes, marca esa
+  DB como si ya estuviera en la migración baseline y recién ahí aplica el
+  resto. Suficiente para un despliegue local único; no es una garantía para
+  múltiples instancias corriendo en paralelo.
 
 ## Estilo de código
 
@@ -215,8 +257,11 @@ funciones y módulos pequeños y con una responsabilidad.
 ## Estrategia de testing
 
 - **Backend:** `pytest`. Foco en (1) las 3 conversiones de moneda, (2) cálculo
-  de `effective_rate`, (3) endpoint `/api/summary`, (4) flujo de config/wizard.
-  Tests usan una SQLite en memoria o temporal, nunca la DB real.
+  de `effective_rate`, (3) endpoint `/api/summary`, (4) flujo de config/wizard,
+  (5) CRUD de categorías y tarjetas + sus reglas (409 en uso, 409 tarjeta
+  desactivada, cupo disponible), (6) que la cadena de Alembic coincida con los
+  modelos (`test_migrations.py`). Tests usan una SQLite en memoria o temporal,
+  nunca la DB real.
 - **Frontend:** Vitest + React Testing Library si alcanza el tiempo; prioridad a
   la lógica de conversión/formateo y al render del wizard.
 - Correr tests antes de cada commit.
@@ -289,7 +334,8 @@ funciones y módulos pequeños y con una responsabilidad.
   resaltado en **verde si es positivo, rojo si es negativo**, en las 3 monedas.
   El saldo se deriva del flujo (ingresos − gastos), sin modelo de cuentas ni
   saldo inicial de efectivo. La **deuda de cada tarjeta** (Σ `card_expenses`) se
-  muestra por separado, naturalmente en rojo.
+  muestra por separado, naturalmente en rojo (desde D17, en la moneda nativa
+  de cada tarjeta — antes se mezclaba todo en CLP).
 - **D12 — IC (ICOCA) como gasto, no como cuenta:** la ICOCA **no** se modela
   como cuenta con saldo. La recarga de la tarjeta se registra como un **gasto
   único** (p.ej. en `monthly_expenses`, categoría "ICOCA", en JPY); los gastos

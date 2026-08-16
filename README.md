@@ -16,18 +16,29 @@ tanto como que funcione.
 
 ## Qué hace
 
-- **Wizard de primer arranque**: eliges tus monedas principales (mín. 2 de
-  CLP/JPY/USD) una sola vez.
+- **Wizard de primer arranque** (2 pasos): eliges tus monedas principales
+  (mín. 2 de CLP/JPY/USD) y registras tu primera tarjeta. Si cierras a mitad
+  de camino, retoma donde quedó.
+- **Tarjetas de crédito**: las defines vos (nombre, moneda, cupo total), sin
+  límite de cantidad. El **cupo disponible** se calcula solo (`cupo − gastos +
+  pagos`); se desactivan en vez de borrarse (una tarjeta desactivada no acepta
+  gastos nuevos, pero sí pagos y conserva su historial).
+- **Categorías de gasto**: catálogo propio con CRUD completo (crear, editar,
+  borrar), compartido entre gastos mensuales y de tarjeta. No se puede borrar
+  una categoría que ya tiene gastos asociados.
 - **CRUD de movimientos**:
   - **Ingresos** en cualquiera de las 3 monedas.
-  - **Gastos de tarjeta** (2 tarjetas chilenas, en CLP).
-  - **Gastos mensuales** (incluye la recarga de la ICOCA como un gasto más).
+  - **Gastos de tarjeta**, en la moneda de la tarjeta elegida.
+  - **Gastos mensuales** (incluye la recarga de la ICOCA como un gasto más),
+    con **estado** `pagado`/`anulado` en vez de borrado — un gasto anulado no
+    cuenta en el balance pero el registro nunca se pierde. Filtros combinables
+    por texto, categoría, fecha o mes, y estado.
   - **Gastos fijos** recurrentes (arriendo, créditos, suscripciones) con día de pago.
   - **Retiros de dinero** CLP→JPY: registras el JPY recibido y el CLP que te
     cobró el banco; la **tasa efectiva** se calcula sola.
 - **Dashboard del mes** con **saldo nativo por moneda** (verde si es positivo,
   rojo si es negativo), el **equivalente total** convertido a las 3 monedas y la
-  **deuda de cada tarjeta** por separado, en rojo.
+  **deuda de cada tarjeta** por separado, en la moneda de cada una.
 - **Conversión de moneda** a partir de **una** llamada diaria a una API pública
   de tasas (base USD), cacheada 1×/día. Todos los montos se guardan en su moneda
   nativa y se convierten solo al mostrar.
@@ -42,18 +53,26 @@ Todo el dinero se maneja con `Decimal`/`Numeric` (nunca `float`).
 |---|---|
 | ![Dashboard](docs/img/dashboard.png) | ![Retiro de dinero](docs/img/retiro.png) |
 
-_Para regenerarlas: levanta la app con datos de demo (`./deploy.sh`) y guarda las
-capturas en `docs/img/`._
+_Para regenerarlas: levanta la app con datos de demo (`./deploy.sh demo`) y
+guarda las capturas en `docs/img/`._
 
 ## Levantar la app
 
 ### Opción recomendada: `deploy.sh`
 
-Un solo comando construye, levanta y abre una consola en vivo. Si la base está
-vacía, crea datos de demo automáticamente.
+Un solo comando construye, levanta y abre una consola en vivo — en **modo
+productivo**: crea la base si no existe, pero nunca la puebla con datos de
+demo.
 
 ```bash
 ./deploy.sh
+```
+
+Para levantar con datos de demo ficticios (solo si la base está vacía; nunca
+pisa datos reales), usa `demo`:
+
+```bash
+./deploy.sh demo
 ```
 
 En la consola en vivo:
@@ -64,10 +83,7 @@ En la consola en vivo:
 Otros comandos:
 
 ```bash
-./deploy.sh up --no-seed   # levanta sin crear datos de demo (para uso real)
-./deploy.sh up --seed      # fuerza recargar los datos de demo (los reemplaza)
-./deploy.sh up --detach    # levanta y sale (sin consola en vivo)
-./deploy.sh seed           # puebla datos de demo en un backend ya levantado
+./deploy.sh --detach       # levanta y sale (sin consola en vivo); combinable con demo
 ./deploy.sh down           # detiene y elimina los contenedores
 ./deploy.sh logs           # sigue los logs
 ./deploy.sh status         # estado de los servicios
@@ -91,6 +107,7 @@ Backend (desde `backend/`, con venv en `backend/.venv`):
 
 ```bash
 .venv/bin/python -m pip install -r requirements.txt
+.venv/bin/alembic upgrade head    # opcional en DB nueva; siembra las categorías iniciales
 .venv/bin/python -m uvicorn app.main:app --reload --port 7412
 ```
 
@@ -140,16 +157,18 @@ docker compose exec backend python scripts/seed_demo.py
 backend/
   app/
     main.py            # entrypoint FastAPI + CORS
-    models.py          # modelos ORM (Numeric para dinero, enum Currency)
-    routers/           # config, income, card/monthly/fixed expenses, transfers, summary…
-    services/          # exchange_rates.py, summary.py
+    models.py          # modelos ORM (Numeric para dinero, enums Currency/ExpenseStatus/CardStatus)
+    routers/           # config, categories, credit-cards, card-expenses, card-payments,
+                        # monthly/fixed expenses, income, transfers, summary…
+    services/          # exchange_rates.py, cards.py (cupo disponible), summary.py
+  alembic/{env.py,versions/}   # migraciones de schema
   scripts/seed_demo.py
   tests/               # pytest (SQLite temporal, nunca la DB real)
-  Dockerfile
+  Dockerfile           # corre `alembic upgrade head` antes de uvicorn
 frontend/
-  src/{api,components,pages,lib}/
+  src/{api,components,pages,lib}/   # Cards.tsx, Categories.tsx, MonthlyExpenses.tsx (filtros)…
   Dockerfile · nginx.conf
-docs/spec.md           # spec v1 + decisiones D1–D14
+docs/spec.md           # spec v1 + decisiones D1–D18
 tasks/                 # plan e progreso
 deploy.sh · docker-compose.yml
 ```
@@ -161,8 +180,11 @@ cd backend && .venv/bin/python -m pytest
 ```
 
 Prioriza las 3 conversiones de moneda, el cálculo de la tasa efectiva de retiros,
-el endpoint de consolidación (`/api/summary`) y el flujo de config/wizard. Los
-tests usan una SQLite temporal y no tocan la red ni `finanzas.db`.
+el endpoint de consolidación (`/api/summary`), el flujo de config/wizard, el
+CRUD de categorías y tarjetas (incluidas sus reglas: 409 al borrar una
+categoría en uso, 409 al gastar en una tarjeta desactivada, cálculo de cupo
+disponible), y que la cadena de migraciones de Alembic coincida con los
+modelos. Los tests usan una SQLite temporal y no tocan la red ni `finanzas.db`.
 
 ## Seguridad
 
@@ -174,5 +196,6 @@ tests usan una SQLite temporal y no tocan la red ni `finanzas.db`.
 ## Diseño y decisiones
 
 El detalle vive en [`docs/spec.md`](docs/spec.md), incluidas las decisiones
-D1–D14 (p.ej. **D13**: el retiro es un movimiento entre monedas, no un gasto;
-**D14**: gastos fijos en UF, diferidos a una v2).
+D1–D18 (p.ej. **D13**: el retiro es un movimiento entre monedas, no un gasto;
+**D15**: gastos mensuales se anulan por estado en vez de borrarse; **D17**:
+gestión de tarjetas con cupo dinámico y sin límite de cantidad).

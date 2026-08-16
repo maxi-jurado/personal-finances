@@ -301,3 +301,208 @@ entorno, y nota explícita sobre `seed_demo.py` (no expone datos reales).
 **Scope:** M
 
 ### Checkpoint: Complete → `docker-compose up` OK, criterios del spec cumplidos
+
+---
+
+## Phase 5 — Categorías, estado de gastos, tarjetas y filtros
+
+> Ampliación post-v1 (D15–D18 en `docs/spec.md`): estado en vez de delete en
+> gastos mensuales, tabla real de categorías, gestión completa de tarjetas
+> (currency/cupo/pagos, sin límite de cantidad) y filtros combinables. Requirió
+> introducir Alembic (el proyecto solo tenía `create_all()`, que no altera
+> tablas existentes).
+
+## Task 17: Alembic (infra)
+**Description:** Introducir migraciones de schema. Baseline que reproduce el
+schema de v1 tal cual, para no perder el `finanzas.db` local ya existente.
+
+**Acceptance criteria:**
+- [x] `alembic upgrade head` desde vacío reproduce el schema de `Base.metadata`
+- [x] Migraciones corren en el entrypoint de Docker, no en el `lifespan` de
+      FastAPI (tests siguen usando `create_all()` directo)
+- [x] Fallback de `stamp` a la baseline para el `finanzas.db` local pre-Alembic
+
+**Verification:**
+- [x] `pytest` verde (incluye `test_migrations.py`, nuevo)
+- [x] Manual: migración probada contra datos legacy reales (tarjeta + gasto)
+
+**Dependencies:** None
+**Files:** `backend/alembic/`, `backend/alembic.ini`, `backend/requirements.txt`, `backend/Dockerfile`, `backend/tests/test_migrations.py`
+**Scope:** M
+
+## Task 18: Categorías backend
+**Description:** Tabla `categories` con CRUD completo (crear/listar/editar/borrar).
+
+**Acceptance criteria:**
+- [x] Nombre único; 409 si duplicado
+- [x] `DELETE` bloqueado (409) si la categoría está en uso — implementado en
+      Task 19, una vez existe la FK que la referencia
+
+**Verification:**
+- [x] `pytest` verde
+
+**Dependencies:** Task 17
+**Files:** `backend/app/models.py`, `backend/app/routers/categories.py`, `backend/app/schemas.py`, `backend/alembic/versions/0002_categories.py`, `backend/tests/test_categories.py`
+**Scope:** M
+
+## Task 19: Categorías FK en gastos
+**Description:** `monthly_expenses`/`card_expenses.category` (texto libre, D2)
+pasa a `category_id` FK. Backfill lookup-or-create desde los strings
+existentes antes de dropear la columna vieja.
+
+**Acceptance criteria:**
+- [x] Migración con backfill probada con datos reales pre-existentes
+- [x] `category_id` inválido → 404 al crear un gasto
+- [x] `DELETE /api/categories/{id}` → 409 si está en uso
+
+**Verification:**
+- [x] `pytest` verde
+
+**Dependencies:** Task 18
+**Files:** `backend/app/models.py`, `backend/app/routers/monthly_expenses.py`, `backend/app/routers/card_expenses.py`, `backend/app/routers/categories.py`, `backend/alembic/versions/0003_*.py`, `0004_*.py`, `backend/scripts/seed_demo.py`
+**Scope:** M
+
+## Task 20: Categorías frontend
+**Description:** Pantalla "Categorías" (CRUD) + selects reales en los
+formularios de gasto mensual y de tarjeta (reemplazan el input de texto libre).
+
+**Acceptance criteria:**
+- [x] Crear/editar/borrar categoría desde la UI; 409 mostrado como error
+- [x] Selects poblados desde `/api/categories` en ambos formularios
+
+**Verification:**
+- [x] `npm run build` OK
+- [x] Manual en navegador: CRUD completo + bloqueo 409 verificados en vivo
+
+**Dependencies:** Task 19
+**Files:** `frontend/src/api/categories.ts`, `frontend/src/api/client.ts`, `frontend/src/pages/Categories.tsx`, `frontend/src/pages/MonthlyExpenses.tsx`, `frontend/src/pages/CardExpenses.tsx`, `frontend/src/components/AppShell.tsx`
+**Scope:** M
+
+## Task 21: Estado de gastos mensuales backend
+**Description:** `status: pagado | anulado` en vez de delete (D15). Anulado se
+excluye del summary. Filtros combinables en `GET /api/monthly-expenses` (D18).
+
+**Acceptance criteria:**
+- [x] Default `pagado`; `PATCH /{id}/status` anula/reactiva
+- [x] `/api/summary` excluye anulados
+- [x] Filtros `q`/`category_id`/`date_from`+`date_to`/`month`/`status`,
+      combinables con AND; `month` + rango de fechas juntos → 422
+
+**Verification:**
+- [x] `pytest` verde
+
+**Dependencies:** Task 19
+**Files:** `backend/app/models.py`, `backend/app/routers/monthly_expenses.py`, `backend/app/services/summary.py`, `backend/alembic/versions/0005_*.py`
+**Scope:** M
+
+## Task 22: Estado de gastos mensuales frontend
+**Description:** Barra de filtros (texto, categoría, fecha/mes, estado) +
+acción anular/reactivar por fila.
+
+**Acceptance criteria:**
+- [x] Por defecto solo pagados; filtro de estado permite ver anulados/todos
+- [x] Anular/reactivar actualiza la fila sin recargar la página
+
+**Verification:**
+- [x] `npm run build` OK
+- [x] Manual en navegador: anular saca el gasto de la vista, reaparece con el filtro
+
+**Dependencies:** Task 21
+**Files:** `frontend/src/api/monthlyExpenses.ts`, `frontend/src/pages/MonthlyExpenses.tsx`
+**Scope:** M
+
+## Task 23: Tarjetas backend
+**Description:** Reemplaza el par fijo "Tarjeta 1"/"Tarjeta 2" por CRUD real
+(D17): nombre, `currency`, `credit_limit`, sin límite de cantidad, estado
+activa/desactivada. `card_expenses.amount_clp` se generaliza a `amount` en la
+moneda de la tarjeta — destapó que `summary.py` mezclaba toda deuda en CLP.
+
+**Acceptance criteria:**
+- [x] Sin límite de tarjetas; `currency` inmutable post-creación
+- [x] Desactivar bloquea gastos nuevos (409) pero no el historial
+- [x] `available_credit = credit_limit - gastos` (se completa en Task 24)
+- [x] Deuda de cada tarjeta en su propia moneda nativa en `/api/summary`
+
+**Verification:**
+- [x] `pytest` verde
+- [x] Manual: migración probada contra datos legacy reales
+
+**Dependencies:** Task 19
+**Files:** `backend/app/models.py`, `backend/app/database.py`, `backend/app/routers/cards.py`, `backend/app/routers/card_expenses.py`, `backend/app/services/cards.py`, `backend/app/services/summary.py`, `backend/alembic/versions/0006_*.py`
+**Scope:** M
+
+## Task 24: Pagos de tarjeta backend
+**Description:** `CardPayment` repone cupo disponible. Se permite incluso con
+la tarjeta desactivada.
+
+**Acceptance criteria:**
+- [x] `available_credit = credit_limit - gastos + pagos`
+- [x] Pago válido en tarjeta desactivada
+
+**Verification:**
+- [x] `pytest` verde
+
+**Dependencies:** Task 23
+**Files:** `backend/app/models.py`, `backend/app/routers/card_payments.py`, `backend/app/services/cards.py`, `backend/alembic/versions/0007_*.py`
+**Scope:** S
+
+## Task 25: Tarjetas frontend
+**Description:** Pantalla "Tarjetas" (crear/editar/activar/desactivar + pagos)
+y `CardExpenses.tsx` con selector real y moneda dinámica.
+
+**Acceptance criteria:**
+- [x] CRUD de tarjetas + registro de pagos desde la UI
+- [x] Tarjeta desactivada no aparece en el selector de gastos nuevos
+
+**Verification:**
+- [x] `npm run build` OK
+- [x] Manual en navegador: crear tarjeta JPY, pagar, desactivar — verificado en vivo
+
+**Dependencies:** Task 24
+**Files:** `frontend/src/api/cards.ts`, `frontend/src/api/cardPayments.ts`, `frontend/src/pages/Cards.tsx`, `frontend/src/pages/CardExpenses.tsx`, `frontend/src/components/AppShell.tsx`
+**Scope:** M
+
+## Task 26: Wizard — paso de tarjetas
+**Description:** Wizard pasa de 1 a 2 pasos (monedas, luego primera tarjeta).
+`App.tsx` resume en el paso correcto según config/tarjetas existentes.
+
+**Acceptance criteria:**
+- [x] Config sin tarjetas → resume directo en paso 2 al recargar
+- [x] Config + tarjeta → salta el wizard siempre
+
+**Verification:**
+- [x] Manual en navegador: flujo completo y caso de resume verificados en vivo
+
+**Dependencies:** Task 25
+**Files:** `frontend/src/pages/Wizard.tsx`, `frontend/src/App.tsx`
+**Scope:** M
+
+## Task 27: seed_demo.py rework
+**Description:** Categorías, tarjetas y pagos de tarjeta demo (hecho en
+paralelo a 19/23/24 para no dejar el script roto).
+
+**Acceptance criteria:**
+- [x] Idempotente con categorías/tarjetas/pagos incluidos
+
+**Verification:**
+- [x] Corrida manual 2 veces seguidas, mismo estado final
+
+**Dependencies:** Tasks 19, 23, 24
+**Files:** `backend/scripts/seed_demo.py`
+**Scope:** S
+
+## Task 28: Consolidación docs
+**Description:** `docs/spec.md` (D15–D18 + sección Migraciones), `README.md`/`README.en.md`.
+
+**Acceptance criteria:**
+- [x] Spec y READMEs reflejan el flujo real (wizard de 2 pasos, `deploy.sh
+      demo`, tarjetas/categorías/estado/filtros, Alembic)
+
+**Verification:**
+- [x] Revisión manual de coherencia end-to-end
+
+**Dependencies:** Tasks 17–27
+**Files:** `docs/spec.md`, `README.md`, `README.en.md`, `tasks/todo.md`
+**Scope:** S
+
+### Checkpoint: Phase 5 completa → 119 tests backend en verde, build de frontend limpio, flujos verificados en vivo
