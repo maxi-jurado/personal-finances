@@ -7,7 +7,8 @@ export interface MonthlyExpense {
   id: number;
   date: string; // YYYY-MM-DD
   description: string;
-  category: string;
+  category_id: number;
+  category_name: string;
   currency: Currency;
   amount: string; // Decimal serializado como string
   notes: string | null;
@@ -16,7 +17,7 @@ export interface MonthlyExpense {
 export interface MonthlyExpenseCreate {
   date: string;
   description: string;
-  category: string;
+  category_id: number;
   currency: Currency;
   amount: string;
   notes?: string | null;

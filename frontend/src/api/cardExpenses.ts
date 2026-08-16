@@ -12,7 +12,8 @@ export interface CardExpense {
   card_id: number;
   date: string; // YYYY-MM-DD
   description: string;
-  category: string;
+  category_id: number;
+  category_name: string;
   amount_clp: string; // Decimal serializado como string
   notes: string | null;
 }
@@ -20,7 +21,7 @@ export interface CardExpense {
 export interface CardExpenseCreate {
   date: string;
   description: string;
-  category: string;
+  category_id: number;
   amount_clp: string;
   notes?: string | null;
 }

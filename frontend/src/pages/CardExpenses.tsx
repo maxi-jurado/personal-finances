@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { Category, listCategories } from "../api/categories";
 import { ApiError } from "../api/client";
 import {
   CardExpense,
@@ -15,14 +16,14 @@ const today = () => new Date().toISOString().slice(0, 10);
 interface FormState {
   date: string;
   description: string;
-  category: string;
+  category_id: string;
   amount_clp: string;
 }
 
 const emptyForm = (): FormState => ({
   date: today(),
   description: "",
-  category: "",
+  category_id: "",
   amount_clp: "",
 });
 
@@ -30,6 +31,7 @@ export default function CardExpenses() {
   const [cards, setCards] = useState<CreditCard[]>([]);
   const [activeCard, setActiveCard] = useState<number | null>(null);
   const [rows, setRows] = useState<CardExpense[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -44,6 +46,9 @@ export default function CardExpenses() {
       })
       .catch((err: unknown) => setError(errorMessage(err)))
       .finally(() => setLoading(false));
+    listCategories()
+      .then(setCategories)
+      .catch((err: unknown) => setError(errorMessage(err)));
   }, []);
 
   // Carga los gastos de la tarjeta activa.
@@ -61,7 +66,7 @@ export default function CardExpenses() {
   const canSubmit =
     activeCard !== null &&
     form.description.trim() !== "" &&
-    form.category.trim() !== "" &&
+    form.category_id !== "" &&
     Number(form.amount_clp) > 0 &&
     !saving;
 
@@ -74,7 +79,7 @@ export default function CardExpenses() {
       const created = await createCardExpense(activeCard, {
         date: form.date,
         description: form.description.trim(),
-        category: form.category.trim(),
+        category_id: Number(form.category_id),
         amount_clp: form.amount_clp,
       });
       setRows((prev) => [created, ...prev]);
@@ -133,12 +138,20 @@ export default function CardExpenses() {
         </label>
         <label className="flex flex-col text-sm sm:col-span-2">
           <span className="text-slate-500">Categoría</span>
-          <input
-            type="text"
-            value={form.category}
-            onChange={(e) => set("category", e.target.value)}
+          <select
+            value={form.category_id}
+            onChange={(e) => set("category_id", e.target.value)}
             className="mt-1 rounded border border-slate-300 px-2 py-1"
-          />
+          >
+            <option value="" disabled>
+              Elegir…
+            </option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="flex flex-col text-sm sm:col-span-1">
           <span className="text-slate-500">Monto (CLP)</span>
@@ -198,7 +211,7 @@ export default function CardExpenses() {
                 <tr key={row.id} className="border-b border-slate-100 last:border-0">
                   <td className="px-4 py-2 text-slate-600">{row.date}</td>
                   <td className="px-4 py-2 text-slate-800">{row.description}</td>
-                  <td className="px-4 py-2 text-slate-600">{row.category}</td>
+                  <td className="px-4 py-2 text-slate-600">{row.category_name}</td>
                   <td className="px-4 py-2 text-right tabular-nums text-slate-800">
                     {formatMoney(row.amount_clp, "CLP")}
                   </td>

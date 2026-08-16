@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { Category, listCategories } from "../api/categories";
 import { ApiError } from "../api/client";
 import { CURRENCIES, Currency } from "../api/config";
 import {
@@ -14,7 +15,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 interface FormState {
   date: string;
   description: string;
-  category: string;
+  category_id: string;
   currency: Currency;
   amount: string;
 }
@@ -22,13 +23,14 @@ interface FormState {
 const emptyForm = (): FormState => ({
   date: today(),
   description: "",
-  category: "",
+  category_id: "",
   currency: "CLP",
   amount: "",
 });
 
 export default function MonthlyExpenses() {
   const [rows, setRows] = useState<ExpenseRow[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -39,6 +41,9 @@ export default function MonthlyExpenses() {
       .then(setRows)
       .catch((err: unknown) => setError(errorMessage(err)))
       .finally(() => setLoading(false));
+    listCategories()
+      .then(setCategories)
+      .catch((err: unknown) => setError(errorMessage(err)));
   }, []);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
@@ -46,7 +51,7 @@ export default function MonthlyExpenses() {
 
   const canSubmit =
     form.description.trim() !== "" &&
-    form.category.trim() !== "" &&
+    form.category_id !== "" &&
     Number(form.amount) > 0 &&
     !saving;
 
@@ -59,7 +64,7 @@ export default function MonthlyExpenses() {
       const created = await createMonthlyExpense({
         date: form.date,
         description: form.description.trim(),
-        category: form.category.trim(),
+        category_id: Number(form.category_id),
         currency: form.currency,
         amount: form.amount,
       });
@@ -76,7 +81,7 @@ export default function MonthlyExpenses() {
     <section>
       <h2 className="text-xl font-semibold text-slate-800">Gastos mensuales</h2>
       <p className="mt-1 text-sm text-slate-500">
-        Incluye la recarga de la ICOCA como un gasto más (categoría libre).
+        Incluye la recarga de la ICOCA como un gasto más.
       </p>
 
       <form
@@ -103,12 +108,20 @@ export default function MonthlyExpenses() {
         </label>
         <label className="flex flex-col text-sm sm:col-span-1">
           <span className="text-slate-500">Categoría</span>
-          <input
-            type="text"
-            value={form.category}
-            onChange={(e) => set("category", e.target.value)}
+          <select
+            value={form.category_id}
+            onChange={(e) => set("category_id", e.target.value)}
             className="mt-1 rounded border border-slate-300 px-2 py-1"
-          />
+          >
+            <option value="" disabled>
+              Elegir…
+            </option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="flex flex-col text-sm sm:col-span-1">
           <span className="text-slate-500">Moneda</span>
@@ -182,7 +195,7 @@ export default function MonthlyExpenses() {
                 <tr key={row.id} className="border-b border-slate-100 last:border-0">
                   <td className="px-4 py-2 text-slate-600">{row.date}</td>
                   <td className="px-4 py-2 text-slate-800">{row.description}</td>
-                  <td className="px-4 py-2 text-slate-600">{row.category}</td>
+                  <td className="px-4 py-2 text-slate-600">{row.category_name}</td>
                   <td className="px-4 py-2 text-right tabular-nums text-slate-800">
                     {formatMoney(row.amount, row.currency)}
                   </td>
