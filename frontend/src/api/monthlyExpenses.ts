@@ -3,6 +3,8 @@
 import { api } from "./client";
 import { Currency } from "./config";
 
+export type ExpenseStatus = "pagado" | "anulado";
+
 export interface MonthlyExpense {
   id: number;
   date: string; // YYYY-MM-DD
@@ -12,6 +14,7 @@ export interface MonthlyExpense {
   currency: Currency;
   amount: string; // Decimal serializado como string
   notes: string | null;
+  status: ExpenseStatus;
 }
 
 export interface MonthlyExpenseCreate {
@@ -23,8 +26,26 @@ export interface MonthlyExpenseCreate {
   notes?: string | null;
 }
 
-export const listMonthlyExpenses = () =>
-  api.get<MonthlyExpense[]>("/monthly-expenses");
+export interface MonthlyExpenseFilters {
+  q?: string;
+  category_id?: number;
+  date_from?: string;
+  date_to?: string;
+  month?: string; // YYYY-MM
+  status?: ExpenseStatus | "all";
+}
+
+export const listMonthlyExpenses = (filters: MonthlyExpenseFilters = {}) => {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  }
+  const query = params.toString();
+  return api.get<MonthlyExpense[]>(`/monthly-expenses${query ? `?${query}` : ""}`);
+};
 
 export const createMonthlyExpense = (payload: MonthlyExpenseCreate) =>
   api.post<MonthlyExpense>("/monthly-expenses", payload);
+
+export const updateMonthlyExpenseStatus = (id: number, status: ExpenseStatus) =>
+  api.patch<MonthlyExpense>(`/monthly-expenses/${id}/status`, { status });
