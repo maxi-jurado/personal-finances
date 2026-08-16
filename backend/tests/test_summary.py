@@ -34,6 +34,12 @@ def category_id(client) -> int:
     return resp.json()["id"]
 
 
+def _card(client, **overrides) -> int:
+    base = {"name": "Banco Santander", "currency": "CLP", "credit_limit": "500000"}
+    base.update(overrides)
+    return client.post("/api/credit-cards", json=base).json()["id"]
+
+
 def _dec(value) -> Decimal:
     return Decimal(str(value))
 
@@ -53,13 +59,14 @@ def test_mes_sin_datos_da_ceros(client, rates):
 
 def test_saldo_nativo_por_moneda(client, rates, category_id):
     # Sueldo 2 USD; gasto de tarjeta 900 CLP.
+    card_id = _card(client)
     client.post(
         "/api/income",
         json={"date": "2026-08-01", "description": "Sueldo", "category": "Salario", "currency": "USD", "amount": "2"},
     )
     client.post(
-        "/api/card-expenses/1",
-        json={"date": "2026-08-10", "description": "Compra", "category_id": category_id, "amount_clp": "900"},
+        f"/api/card-expenses/{card_id}",
+        json={"date": "2026-08-10", "description": "Compra", "category_id": category_id, "amount": "900"},
     )
 
     body = client.get("/api/summary?month=2026-08").json()
@@ -109,21 +116,41 @@ def test_gasto_fijo_cuenta_en_cualquier_mes(client, rates):
 
 
 def test_card_debt_por_tarjeta(client, rates, category_id):
+    clp_card = _card(client, name="CLP card", currency="CLP")
     client.post(
-        "/api/card-expenses/1",
-        json={"date": "2026-08-02", "description": "A", "category_id": category_id, "amount_clp": "900"},
-    )
-    client.post(
-        "/api/card-expenses/2",
-        json={"date": "2026-08-03", "description": "B", "category_id": category_id, "amount_clp": "1800"},
+        f"/api/card-expenses/{clp_card}",
+        json={"date": "2026-08-02", "description": "A", "category_id": category_id, "amount": "900"},
     )
 
     cards = client.get("/api/summary?month=2026-08").json()["cards"]
     by_id = {c["card_id"]: c for c in cards}
-    assert _dec(by_id[1]["debt"]["CLP"]) == Decimal("900")
-    assert _dec(by_id[1]["debt"]["USD"]) == Decimal("1")
-    assert _dec(by_id[2]["debt"]["CLP"]) == Decimal("1800")
-    assert _dec(by_id[2]["debt"]["USD"]) == Decimal("2")
+    assert _dec(by_id[clp_card]["debt"]["CLP"]) == Decimal("900")
+    assert _dec(by_id[clp_card]["debt"]["USD"]) == Decimal("1")
+
+
+def test_card_debt_en_moneda_nativa_de_cada_tarjeta(client, rates, category_id):
+    # D17: cada tarjeta guarda su deuda en su propia moneda, no forzada a CLP.
+    clp_card = _card(client, name="CLP card", currency="CLP")
+    jpy_card = _card(client, name="JPY card", currency="JPY")
+    client.post(
+        f"/api/card-expenses/{clp_card}",
+        json={"date": "2026-08-02", "description": "A", "category_id": category_id, "amount": "900"},
+    )
+    client.post(
+        f"/api/card-expenses/{jpy_card}",
+        json={"date": "2026-08-03", "description": "B", "category_id": category_id, "amount": "300"},
+    )
+
+    cards = client.get("/api/summary?month=2026-08").json()["cards"]
+    by_id = {c["card_id"]: c for c in cards}
+    # Cada deuda se expresa nativa y convertida a las otras 2 monedas (D1
+    # rates: 1 USD = 150 JPY = 900 CLP) — no se mezclan entre tarjetas.
+    assert _dec(by_id[clp_card]["debt"]["CLP"]) == Decimal("900")
+    assert _dec(by_id[clp_card]["debt"]["JPY"]) == Decimal("150")
+    assert _dec(by_id[clp_card]["debt"]["USD"]) == Decimal("1")
+    assert _dec(by_id[jpy_card]["debt"]["JPY"]) == Decimal("300")
+    assert _dec(by_id[jpy_card]["debt"]["CLP"]) == Decimal("1800")
+    assert _dec(by_id[jpy_card]["debt"]["USD"]) == Decimal("2")
 
 
 def test_sin_tasas_ni_datos_da_ceros(client):

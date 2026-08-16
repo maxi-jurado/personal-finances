@@ -88,8 +88,8 @@ config            (id, currencies_json, base_currency, created_at)
 exchange_rates    (id, date, base_currency, target_currency, rate, fetched_at)
 income            (id, date, description, category, currency, amount, notes)
 categories        (id, name)                      -- D16; usada por monthly_expenses/card_expenses
-credit_cards      (id, name)                     -- exactamente 2 filas: Tarjeta 1 / Tarjeta 2
-card_expenses     (id, card_id FK, date, description, category_id FK, amount_clp, notes)
+credit_cards      (id, name, currency, credit_limit, status)  -- D17; sin límite de cantidad
+card_expenses     (id, card_id FK, date, description, category_id FK, amount, notes)  -- amount en card.currency
 monthly_expenses  (id, date, description, category_id FK, currency, amount, notes, status)  -- D15
 fixed_expenses    (id, concept, currency, amount, payment_day, notes)
 transfers         (id, date, jpy_requested, clp_charged, effective_rate, notes)
@@ -108,6 +108,8 @@ GET/POST   /api/config
 GET        /api/exchange-rates/latest
 GET/POST   /api/income
 GET/POST/PATCH/DELETE  /api/categories, /api/categories/{id}         -- D16
+GET/POST/PATCH  /api/credit-cards, /api/credit-cards/{id}            -- D17
+PATCH      /api/credit-cards/{id}/status                             -- D17
 GET/POST   /api/card-expenses/{card_id}
 GET/POST   /api/monthly-expenses?q=&category_id=&date_from=&date_to=&month=&status=   -- D15, D18
 PATCH      /api/monthly-expenses/{id}/status                                          -- D15
@@ -324,6 +326,17 @@ funciones y módulos pequeños y con una responsabilidad.
   gasto (Alimentación, Transporte, etc.). Set inicial sembrado por migración:
   Alimentación, Entretenimiento, Estilo de Vida, Gustos Personales, Aseo y
   Limpieza, Transporte, Salud, Vivienda y Servicios.
+- **D17 — Gestión de tarjetas (reemplaza el par fijo "Tarjeta 1"/"Tarjeta 2"):**
+  `credit_cards` deja de auto-sembrarse con exactamente 2 filas — el usuario
+  las crea (nombre, `currency`, `credit_limit`), **sin límite de cantidad**.
+  No hay delete: se desactivan por estado (`activa`/`desactivada`, mismo
+  criterio que D15). Desactivar bloquea **gastos nuevos** (409 en
+  `POST /api/card-expenses/{card_id}`) pero no pagos ni la vista de historial.
+  `card_expenses.amount_clp` se generaliza a `amount`, en la moneda de la
+  tarjeta padre (`card.currency`) en vez de CLP fijo — el summary desglosa la
+  deuda de cada tarjeta en su propia moneda nativa (D11, actualizado). El
+  cupo disponible (`credit_limit - gastos`) se calcula, no se almacena;
+  `currency` es inmutable después de creada la tarjeta.
 - **D18 — Filtros combinables en `GET /api/monthly-expenses`:** `q` (texto,
   busca en `description`), `category_id`, `date_from`/`date_to` **o** `month`
   (mutuamente excluyentes, 422 si se combinan ambos), y `status`. Todos son

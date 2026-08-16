@@ -2,7 +2,7 @@
 
 La URL se lee de `DATABASE_URL` (para permitir DBs temporales en tests); por
 defecto usa `finanzas.db` junto a la carpeta `backend/`. `init_db()` crea el
-schema si no existe y siembra las 2 tarjetas de crédito.
+schema si no existe (idempotente).
 """
 
 from __future__ import annotations
@@ -36,19 +36,8 @@ def get_db() -> Session:
 
 
 def init_db() -> None:
-    """Crea el schema (si falta) y siembra datos base. Idempotente."""
+    """Crea el schema (si falta). Idempotente."""
     # Import local para registrar los modelos en Base.metadata sin ciclos.
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
-    _seed_credit_cards()
-
-
-def _seed_credit_cards() -> None:
-    """Garantiza exactamente 2 tarjetas: 'Tarjeta 1' y 'Tarjeta 2'."""
-    from app.models import CreditCard
-
-    with SessionLocal() as db:
-        if db.query(CreditCard).count() == 0:
-            db.add_all([CreditCard(name="Tarjeta 1"), CreditCard(name="Tarjeta 2")])
-            db.commit()

@@ -61,9 +61,12 @@ _CATEGORY_NAMES = [
 
 # Tablas de movimientos que el seed reemplaza por completo (idempotencia).
 # `Category` queda afuera: es dato de referencia, sobrevive a los reseeds.
+# `CreditCard` SÍ se wipea: desde D17 ya no es dato fijo sembrado una vez,
+# es un movimiento más que el usuario define (como el resto de esta lista).
 _MOVEMENT_MODELS = (
     Income,
     CardExpense,
+    CreditCard,
     MonthlyExpense,
     FixedExpense,
     Transfer,
@@ -125,6 +128,18 @@ def _seed_rates(db) -> None:
     fx._store_rates(db, date.today(), dict(DEMO_RATES))
 
 
+def _seed_cards(db) -> dict[str, int]:
+    """Crea 2 tarjetas demo (D17: sin límite de cantidad, definidas por el
+    usuario). Se recrean en cada reseed, como el resto de los movimientos."""
+    cards = [
+        CreditCard(name="Tarjeta 1", currency=Currency.CLP, credit_limit=Decimal("800000")),
+        CreditCard(name="Tarjeta 2", currency=Currency.CLP, credit_limit=Decimal("500000")),
+    ]
+    db.add_all(cards)
+    db.flush()
+    return {c.name: c.id for c in cards}
+
+
 def _seed_fixed_expenses(db) -> None:
     """Gastos fijos recurrentes (sin fecha): aplican a todo mes."""
     db.add_all(
@@ -137,7 +152,10 @@ def _seed_fixed_expenses(db) -> None:
     db.commit()
 
 
-def _seed_monthly(db, months: list[date], categories: dict[str, int]) -> None:
+def _seed_monthly(
+    db, months: list[date], categories: dict[str, int], cards: dict[str, int]
+) -> None:
+    card1, card2 = cards["Tarjeta 1"], cards["Tarjeta 2"]
     for i, m in enumerate(months):
         supermercado = Decimal("42000") + Decimal(1500) * i
         db.add_all(
@@ -148,9 +166,9 @@ def _seed_monthly(db, months: list[date], categories: dict[str, int]) -> None:
                 MonthlyExpense(date=_on(m, 8), description="Supermercado", category_id=categories["Alimentación"], currency=Currency.JPY, amount=supermercado),
                 MonthlyExpense(date=_on(m, 22), description="Supermercado", category_id=categories["Alimentación"], currency=Currency.JPY, amount=Decimal("18000")),
                 MonthlyExpense(date=_on(m, 18), description="Farmacia", category_id=categories["Salud"], currency=Currency.JPY, amount=Decimal("6200")),
-                CardExpense(card_id=1, date=_on(m, 12), description="Compras online", category_id=categories["Estilo de Vida"], amount_clp=Decimal("65000")),
-                CardExpense(card_id=1, date=_on(m, 20), description="Restaurant", category_id=categories["Alimentación"], amount_clp=Decimal("32000") + Decimal(2000) * i),
-                CardExpense(card_id=2, date=_on(m, 15), description="Pasajes", category_id=categories["Transporte"], amount_clp=Decimal("89000")),
+                CardExpense(card_id=card1, date=_on(m, 12), description="Compras online", category_id=categories["Estilo de Vida"], amount=Decimal("65000")),
+                CardExpense(card_id=card1, date=_on(m, 20), description="Restaurant", category_id=categories["Alimentación"], amount=Decimal("32000") + Decimal(2000) * i),
+                CardExpense(card_id=card2, date=_on(m, 15), description="Pasajes", category_id=categories["Transporte"], amount=Decimal("89000")),
             ]
         )
         # Ingreso ocasional en USD algunos meses.
@@ -172,14 +190,15 @@ def _seed_monthly(db, months: list[date], categories: dict[str, int]) -> None:
 
 
 def seed(months: int = 5) -> None:
-    init_db()  # asegura schema + las 2 tarjetas
+    init_db()  # asegura el schema
     with SessionLocal() as db:
         _wipe(db)
         categories = _ensure_categories(db)
+        cards = _seed_cards(db)
         _seed_config(db)
         _seed_rates(db)
         _seed_fixed_expenses(db)
-        _seed_monthly(db, _recent_months(months), categories)
+        _seed_monthly(db, _recent_months(months), categories, cards)
 
         counts = {
             "categories": db.query(Category).count(),

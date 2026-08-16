@@ -103,14 +103,16 @@ def test_borra_categoria_en_uso_por_gasto_mensual_409(client):
 
 def test_borra_categoria_en_uso_por_gasto_de_tarjeta_409(client):
     category = client.post("/api/categories", json=_payload()).json()
-    card_id = client.get("/api/credit-cards").json()[0]["id"]
+    card_id = client.post(
+        "/api/credit-cards", json={"name": "Banco Santander", "currency": "CLP", "credit_limit": "500000"}
+    ).json()["id"]
     client.post(
         f"/api/card-expenses/{card_id}",
         json={
             "date": "2026-08-05",
             "description": "Compra",
             "category_id": category["id"],
-            "amount_clp": "1000",
+            "amount": "1000",
         },
     )
     resp = client.delete(f"/api/categories/{category['id']}")

@@ -33,6 +33,13 @@ class ExpenseStatus(str, enum.Enum):
     ANULADO = "anulado"
 
 
+class CardStatus(str, enum.Enum):
+    """Estado de una tarjeta (D17). Tampoco hay delete de tarjetas."""
+
+    ACTIVA = "activa"
+    DESACTIVADA = "desactivada"
+
+
 # Tipos numéricos reutilizados. `amount` cubre las 3 monedas (JPY/CLP sin
 # decimales, USD con 2); las tasas necesitan más precisión.
 _MONEY = Numeric(18, 4)
@@ -90,10 +97,16 @@ class CreditCard(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
-
-    expenses: Mapped[list["CardExpense"]] = relationship(
-        back_populates="card", cascade="all, delete-orphan"
+    currency: Mapped[Currency] = _currency_col(nullable=False)
+    credit_limit: Mapped[Decimal] = mapped_column(_MONEY, nullable=False)
+    status: Mapped[CardStatus] = mapped_column(
+        SAEnum(CardStatus, name="card_status"),
+        nullable=False,
+        default=CardStatus.ACTIVA,
+        server_default=CardStatus.ACTIVA.value,
     )
+
+    expenses: Mapped[list["CardExpense"]] = relationship(back_populates="card")
 
 
 class CardExpense(Base):
@@ -104,7 +117,7 @@ class CardExpense(Base):
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     description: Mapped[str] = mapped_column(String, nullable=False)
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), nullable=False, index=True)
-    amount_clp: Mapped[Decimal] = mapped_column(_MONEY, nullable=False)
+    amount: Mapped[Decimal] = mapped_column(_MONEY, nullable=False)
     notes: Mapped[str | None] = mapped_column(String, nullable=True)
 
     card: Mapped["CreditCard"] = relationship(back_populates="expenses")

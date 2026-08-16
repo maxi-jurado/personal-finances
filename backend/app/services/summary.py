@@ -6,8 +6,9 @@ para el "total equivalente": el patrimonio del mes expresado en las 3 monedas.
 
 Reglas por fuente:
 - income / monthly_expenses: monto en su moneda nativa, filtrados por `date`.
-- card_expenses: `amount_clp` (CLP), filtrados por `date`. También se desglosan
-  como deuda por tarjeta (D11).
+- card_expenses: `amount` en la moneda de la tarjeta padre (`card.currency`,
+  D17), filtrados por `date`. También se desglosan como deuda por tarjeta
+  (D11), cada una en su propia moneda nativa.
 - fixed_expenses: recurrentes (sin fecha) → cuentan en todo mes consultado.
 - transfers (retiro de dinero): NO es un gasto. Mueve plata entre monedas:
   descuenta `clp_charged` del saldo CLP y suma `jpy_requested` al saldo JPY.
@@ -113,6 +114,9 @@ def compute_summary(db: Session, year: int, month: int) -> Summary:
         )
     ]
 
+    cards = list(db.scalars(select(CreditCard).order_by(CreditCard.name)))
+    card_currency = {c.id: c.currency for c in cards}
+
     card_rows = list(
         db.scalars(
             select(CardExpense).where(CardExpense.date >= start, CardExpense.date < end)
@@ -129,7 +133,7 @@ def compute_summary(db: Session, year: int, month: int) -> Summary:
     ):
         expense_items.append((m.currency, m.amount))
     for c in card_rows:
-        expense_items.append((Currency.CLP, c.amount_clp))
+        expense_items.append((card_currency[c.card_id], c.amount))
     for f in db.scalars(select(FixedExpense)):
         expense_items.append((f.currency, f.amount))
 
@@ -141,8 +145,6 @@ def compute_summary(db: Session, year: int, month: int) -> Summary:
     for t in transfer_rows:
         withdrawals[Currency.CLP] -= t.clp_charged
         withdrawals[Currency.JPY] += t.jpy_requested
-
-    cards = list(db.scalars(select(CreditCard).order_by(CreditCard.id)))
 
     income_raw = _native_sums(income_items)
     expense_raw = _native_sums(expense_items)
@@ -169,10 +171,11 @@ def compute_summary(db: Session, year: int, month: int) -> Summary:
 
     card_debt = []
     for card in cards:
-        clp = sum(
-            (c.amount_clp for c in card_rows if c.card_id == card.id), Decimal(0)
+        spent = sum(
+            (c.amount for c in card_rows if c.card_id == card.id), Decimal(0)
         )
-        native = {Currency.CLP: clp, Currency.JPY: Decimal(0), Currency.USD: Decimal(0)}
+        native = {t: Decimal(0) for t in _TARGETS}
+        native[card.currency] = spent
         debt = {t: _to_currency(native, t, rates) for t in _TARGETS}
         card_debt.append(CardDebt(card.id, card.name, _quantized(debt)))
 

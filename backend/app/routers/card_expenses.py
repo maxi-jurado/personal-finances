@@ -1,4 +1,7 @@
-"""Router de gastos de tarjeta. Los montos van en CLP (`amount_clp`)."""
+"""Router de gastos de tarjeta. El monto se registra en la moneda de la
+tarjeta padre (`card.currency`, D17) — no tiene columna de moneda propia.
+No se puede registrar un gasto nuevo contra una tarjeta desactivada.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import CardExpense, Category, CreditCard
+from app.models import CardExpense, CardStatus, Category, CreditCard
 from app.schemas import ORMModel
 
 router = APIRouter(prefix="/api/card-expenses", tags=["card-expenses"])
@@ -20,7 +23,7 @@ class CardExpenseCreate(BaseModel):
     date: date_type
     description: str = Field(min_length=1)
     category_id: int
-    amount_clp: Decimal = Field(gt=0)
+    amount: Decimal = Field(gt=0)
     notes: str | None = None
 
 
@@ -31,7 +34,7 @@ class CardExpenseRead(ORMModel):
     description: str
     category_id: int
     category_name: str
-    amount_clp: Decimal
+    amount: Decimal
     notes: str | None = None
 
 
@@ -39,6 +42,13 @@ def _require_card(card_id: int, db: Session) -> CreditCard:
     card = db.get(CreditCard, card_id)
     if card is None:
         raise HTTPException(status_code=404, detail="Tarjeta no encontrada.")
+    return card
+
+
+def _require_active_card(card_id: int, db: Session) -> CreditCard:
+    card = _require_card(card_id, db)
+    if card.status != CardStatus.ACTIVA:
+        raise HTTPException(status_code=409, detail="La tarjeta está desactivada.")
     return card
 
 
@@ -64,7 +74,7 @@ def list_card_expenses(card_id: int, db: Session = Depends(get_db)) -> list[Card
 def create_card_expense(
     card_id: int, payload: CardExpenseCreate, db: Session = Depends(get_db)
 ) -> CardExpense:
-    _require_card(card_id, db)
+    _require_active_card(card_id, db)
     _require_category(payload.category_id, db)
     row = CardExpense(card_id=card_id, **payload.model_dump())
     db.add(row)

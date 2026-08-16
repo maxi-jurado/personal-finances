@@ -1,4 +1,4 @@
-"""Tests de la capa de datos: creación de schema, seed e integridad de tipos."""
+"""Tests de la capa de datos: creación de schema e integridad de tipos."""
 
 from sqlalchemy import Float, Numeric, inspect
 
@@ -8,6 +8,7 @@ EXPECTED_TABLES = {
     "config",
     "exchange_rates",
     "income",
+    "categories",
     "credit_cards",
     "card_expenses",
     "monthly_expenses",
@@ -22,18 +23,18 @@ def test_init_db_creates_all_tables():
     assert EXPECTED_TABLES <= tables
 
 
-def test_init_db_seeds_exactly_two_credit_cards():
+def test_init_db_no_siembra_tarjetas():
+    # D17: las tarjetas ya no son fijas, las crea el usuario.
     database.init_db()
     with database.SessionLocal() as db:
-        cards = db.query(models.CreditCard).order_by(models.CreditCard.id).all()
-    assert [c.name for c in cards] == ["Tarjeta 1", "Tarjeta 2"]
+        assert db.query(models.CreditCard).count() == 0
 
 
 def test_init_db_is_idempotent():
     database.init_db()
-    database.init_db()  # segunda llamada no debe duplicar tarjetas
-    with database.SessionLocal() as db:
-        assert db.query(models.CreditCard).count() == 2
+    database.init_db()
+    tables = set(inspect(database.engine).get_table_names())
+    assert EXPECTED_TABLES <= tables
 
 
 def test_currency_enum_is_strictly_three():
@@ -45,7 +46,8 @@ def test_money_columns_use_numeric_not_float():
         models.Income.__table__.c.amount,
         models.MonthlyExpense.__table__.c.amount,
         models.FixedExpense.__table__.c.amount,
-        models.CardExpense.__table__.c.amount_clp,
+        models.CardExpense.__table__.c.amount,
+        models.CreditCard.__table__.c.credit_limit,
         models.Transfer.__table__.c.clp_charged,
         models.Transfer.__table__.c.jpy_requested,
     ]
