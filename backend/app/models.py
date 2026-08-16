@@ -107,6 +107,7 @@ class CreditCard(Base):
     )
 
     expenses: Mapped[list["CardExpense"]] = relationship(back_populates="card")
+    payments: Mapped[list["CardPayment"]] = relationship(back_populates="card")
 
 
 class CardExpense(Base):
@@ -126,6 +127,21 @@ class CardExpense(Base):
     @property
     def category_name(self) -> str:
         return self.category.name
+
+
+class CardPayment(Base):
+    """Pago que repone cupo disponible (D17). Se permite aunque la tarjeta
+    esté desactivada — saldar una deuda es distinto de seguir gastando."""
+
+    __tablename__ = "card_payments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    card_id: Mapped[int] = mapped_column(ForeignKey("credit_cards.id"), nullable=False, index=True)
+    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    amount: Mapped[Decimal] = mapped_column(_MONEY, nullable=False)
+    notes: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    card: Mapped["CreditCard"] = relationship(back_populates="payments")
 
 
 class MonthlyExpense(Base):

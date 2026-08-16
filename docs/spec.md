@@ -90,6 +90,7 @@ income            (id, date, description, category, currency, amount, notes)
 categories        (id, name)                      -- D16; usada por monthly_expenses/card_expenses
 credit_cards      (id, name, currency, credit_limit, status)  -- D17; sin límite de cantidad
 card_expenses     (id, card_id FK, date, description, category_id FK, amount, notes)  -- amount en card.currency
+card_payments     (id, card_id FK, date, amount, notes)          -- D17; repone cupo disponible
 monthly_expenses  (id, date, description, category_id FK, currency, amount, notes, status)  -- D15
 fixed_expenses    (id, concept, currency, amount, payment_day, notes)
 transfers         (id, date, jpy_requested, clp_charged, effective_rate, notes)
@@ -111,6 +112,7 @@ GET/POST/PATCH/DELETE  /api/categories, /api/categories/{id}         -- D16
 GET/POST/PATCH  /api/credit-cards, /api/credit-cards/{id}            -- D17
 PATCH      /api/credit-cards/{id}/status                             -- D17
 GET/POST   /api/card-expenses/{card_id}
+GET/POST   /api/card-payments/{card_id}                              -- D17
 GET/POST   /api/monthly-expenses?q=&category_id=&date_from=&date_to=&month=&status=   -- D15, D18
 PATCH      /api/monthly-expenses/{id}/status                                          -- D15
 GET/POST   /api/fixed-expenses
@@ -335,8 +337,10 @@ funciones y módulos pequeños y con una responsabilidad.
   `card_expenses.amount_clp` se generaliza a `amount`, en la moneda de la
   tarjeta padre (`card.currency`) en vez de CLP fijo — el summary desglosa la
   deuda de cada tarjeta en su propia moneda nativa (D11, actualizado). El
-  cupo disponible (`credit_limit - gastos`) se calcula, no se almacena;
-  `currency` es inmutable después de creada la tarjeta.
+  cupo disponible (`credit_limit - gastos + pagos`, vía tabla nueva
+  `card_payments`) se calcula, no se almacena; `currency` es inmutable
+  después de creada la tarjeta. Un pago se permite incluso con la tarjeta
+  desactivada — saldar una deuda es distinto de seguir gastando en ella.
 - **D18 — Filtros combinables en `GET /api/monthly-expenses`:** `q` (texto,
   busca en `description`), `category_id`, `date_from`/`date_to` **o** `month`
   (mutuamente excluyentes, 422 si se combinan ambos), y `status`. Todos son

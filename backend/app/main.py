@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db
 from app.routers import (
     card_expenses,
+    card_payments,
     cards,
     categories,
     config,
@@ -52,6 +53,7 @@ app.include_router(income.router)
 app.include_router(categories.router)
 app.include_router(cards.router)
 app.include_router(card_expenses.router)
+app.include_router(card_payments.router)
 app.include_router(monthly_expenses.router)
 app.include_router(fixed_expenses.router)
 app.include_router(transfers.router)
