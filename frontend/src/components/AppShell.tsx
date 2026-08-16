@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import CardExpenses from "../pages/CardExpenses";
+import Cards from "../pages/Cards";
 import Categories from "../pages/Categories";
 import Dashboard from "../pages/Dashboard";
 import FixedExpenses from "../pages/FixedExpenses";
@@ -13,6 +14,7 @@ import Transfers from "../pages/Transfers";
 type ViewId =
   | "dashboard"
   | "income"
+  | "cards"
   | "card-expenses"
   | "monthly-expenses"
   | "fixed-expenses"
@@ -28,6 +30,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { id: "dashboard", label: "Dashboard", render: () => <Dashboard /> },
   { id: "income", label: "Ingresos", render: () => <Income /> },
+  { id: "cards", label: "Tarjetas", render: () => <Cards /> },
   {
     id: "card-expenses",
     label: "Gastos de tarjeta",

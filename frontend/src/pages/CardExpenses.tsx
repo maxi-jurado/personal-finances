@@ -5,10 +5,9 @@ import { ApiError } from "../api/client";
 import {
   CardExpense,
   createCardExpense,
-  CreditCard,
   listCardExpenses,
-  listCards,
 } from "../api/cardExpenses";
+import { CreditCard, listCards } from "../api/cards";
 import { formatMoney } from "../lib/money";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -17,14 +16,14 @@ interface FormState {
   date: string;
   description: string;
   category_id: string;
-  amount_clp: string;
+  amount: string;
 }
 
 const emptyForm = (): FormState => ({
   date: today(),
   description: "",
   category_id: "",
-  amount_clp: "",
+  amount: "",
 });
 
 export default function CardExpenses() {
@@ -37,7 +36,8 @@ export default function CardExpenses() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Carga inicial de tarjetas.
+  // Carga inicial de tarjetas (solo activas — no se puede gastar en una
+  // desactivada).
   useEffect(() => {
     listCards()
       .then((list) => {
@@ -63,11 +63,13 @@ export default function CardExpenses() {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  const activeCardData = cards.find((c) => c.id === activeCard) ?? null;
+
   const canSubmit =
     activeCard !== null &&
     form.description.trim() !== "" &&
     form.category_id !== "" &&
-    Number(form.amount_clp) > 0 &&
+    Number(form.amount) > 0 &&
     !saving;
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -80,7 +82,7 @@ export default function CardExpenses() {
         date: form.date,
         description: form.description.trim(),
         category_id: Number(form.category_id),
-        amount_clp: form.amount_clp,
+        amount: form.amount,
       });
       setRows((prev) => [created, ...prev]);
       setForm(emptyForm());
@@ -94,9 +96,11 @@ export default function CardExpenses() {
   return (
     <section>
       <h2 className="text-xl font-semibold text-slate-800">Gastos de tarjeta</h2>
-      <p className="mt-1 text-sm text-slate-500">Montos en CLP.</p>
+      <p className="mt-1 text-sm text-slate-500">
+        El monto se registra en la moneda de la tarjeta elegida.
+      </p>
 
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex flex-wrap gap-2">
         {cards.map((card) => (
           <button
             key={card.id}
@@ -109,9 +113,14 @@ export default function CardExpenses() {
                 : "border-slate-300 bg-white text-slate-600 hover:border-slate-400")
             }
           >
-            {card.name}
+            {card.name} ({card.currency})
           </button>
         ))}
+        {!loading && cards.length === 0 && (
+          <p className="text-sm text-slate-400">
+            No tienes tarjetas activas todavía — creá una en la pestaña "Tarjetas".
+          </p>
+        )}
       </div>
 
       <form
@@ -154,14 +163,16 @@ export default function CardExpenses() {
           </select>
         </label>
         <label className="flex flex-col text-sm sm:col-span-1">
-          <span className="text-slate-500">Monto (CLP)</span>
+          <span className="text-slate-500">
+            Monto{activeCardData ? ` (${activeCardData.currency})` : ""}
+          </span>
           <input
             type="number"
             min="0"
             step="any"
             inputMode="decimal"
-            value={form.amount_clp}
-            onChange={(e) => set("amount_clp", e.target.value)}
+            value={form.amount}
+            onChange={(e) => set("amount", e.target.value)}
             className="mt-1 rounded border border-slate-300 px-2 py-1"
           />
         </label>
@@ -213,7 +224,7 @@ export default function CardExpenses() {
                   <td className="px-4 py-2 text-slate-800">{row.description}</td>
                   <td className="px-4 py-2 text-slate-600">{row.category_name}</td>
                   <td className="px-4 py-2 text-right tabular-nums text-slate-800">
-                    {formatMoney(row.amount_clp, "CLP")}
+                    {formatMoney(row.amount, activeCardData?.currency ?? "CLP")}
                   </td>
                 </tr>
               ))
