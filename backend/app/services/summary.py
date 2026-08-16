@@ -26,6 +26,7 @@ from app.models import (
     CardExpense,
     CreditCard,
     Currency,
+    ExpenseStatus,
     FixedExpense,
     Income,
     MonthlyExpense,
@@ -121,7 +122,9 @@ def compute_summary(db: Session, year: int, month: int) -> Summary:
     expense_items: list[tuple[Currency, Decimal]] = []
     for m in db.scalars(
         select(MonthlyExpense).where(
-            MonthlyExpense.date >= start, MonthlyExpense.date < end
+            MonthlyExpense.date >= start,
+            MonthlyExpense.date < end,
+            MonthlyExpense.status == ExpenseStatus.PAGADO,
         )
     ):
         expense_items.append((m.currency, m.amount))

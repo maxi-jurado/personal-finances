@@ -90,7 +90,7 @@ income            (id, date, description, category, currency, amount, notes)
 categories        (id, name)                      -- D16; usada por monthly_expenses/card_expenses
 credit_cards      (id, name)                     -- exactamente 2 filas: Tarjeta 1 / Tarjeta 2
 card_expenses     (id, card_id FK, date, description, category_id FK, amount_clp, notes)
-monthly_expenses  (id, date, description, category_id FK, currency, amount, notes)
+monthly_expenses  (id, date, description, category_id FK, currency, amount, notes, status)  -- D15
 fixed_expenses    (id, concept, currency, amount, payment_day, notes)
 transfers         (id, date, jpy_requested, clp_charged, effective_rate, notes)
 ```
@@ -109,7 +109,8 @@ GET        /api/exchange-rates/latest
 GET/POST   /api/income
 GET/POST/PATCH/DELETE  /api/categories, /api/categories/{id}         -- D16
 GET/POST   /api/card-expenses/{card_id}
-GET/POST   /api/monthly-expenses
+GET/POST   /api/monthly-expenses?q=&category_id=&date_from=&date_to=&month=&status=   -- D15, D18
+PATCH      /api/monthly-expenses/{id}/status                                          -- D15
 GET/POST   /api/fixed-expenses
 GET/POST   /api/transfers
 GET        /api/summary?month=YYYY-MM      -- balance consolidado del mes en las 3 monedas
@@ -305,6 +306,14 @@ funciones y módulos pequeños y con una responsabilidad.
   recurrente en un valor aproximado más exacto) se define en un spec aparte; no
   se implementa en v1. Requiere ampliar el alcance de unidades (ver Boundaries:
   "Ask first").
+- **D15 — Estado en vez de delete (`monthly_expenses`):** no existe ningún
+  delete en la API. Los gastos mensuales se **anulan** por estado
+  (`status: pagado | anulado`, default `pagado`) en vez de borrarse — cubre
+  errores de digitación sin perder el registro. Un gasto `anulado` se excluye
+  del cálculo de `/api/summary` (no cuenta como gasto real), pero el `GET
+  /api/monthly-expenses` lo **oculta por defecto** en vez de no devolverlo
+  nunca: con `?status=anulado` o `?status=all` se puede volver a ver (D18).
+  Reversible: se puede volver a marcar `pagado`.
 - **D16 — Tabla `categories` (enmienda D2 para gastos):** `monthly_expenses` y
   `card_expenses` dejan de usar `category` como texto libre y pasan a
   `category_id` (FK a `categories`, tabla nueva con `id, name` únicos). CRUD
@@ -315,3 +324,8 @@ funciones y módulos pequeños y con una responsabilidad.
   gasto (Alimentación, Transporte, etc.). Set inicial sembrado por migración:
   Alimentación, Entretenimiento, Estilo de Vida, Gustos Personales, Aseo y
   Limpieza, Transporte, Salud, Vivienda y Servicios.
+- **D18 — Filtros combinables en `GET /api/monthly-expenses`:** `q` (texto,
+  busca en `description`), `category_id`, `date_from`/`date_to` **o** `month`
+  (mutuamente excluyentes, 422 si se combinan ambos), y `status`. Todos son
+  opcionales y se combinan con AND — se puede filtrar por texto + categoría +
+  mes al mismo tiempo. Sin filtros, equivale a `status=pagado` (D15).

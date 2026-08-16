@@ -25,6 +25,14 @@ class Currency(str, enum.Enum):
     USD = "USD"
 
 
+class ExpenseStatus(str, enum.Enum):
+    """Estado de un gasto mensual (D15). No hay delete; anulado se excluye
+    del balance pero el registro queda visible mediante filtro."""
+
+    PAGADO = "pagado"
+    ANULADO = "anulado"
+
+
 # Tipos numéricos reutilizados. `amount` cubre las 3 monedas (JPY/CLP sin
 # decimales, USD con 2); las tasas necesitan más precisión.
 _MONEY = Numeric(18, 4)
@@ -117,6 +125,12 @@ class MonthlyExpense(Base):
     currency: Mapped[Currency] = _currency_col(nullable=False)
     amount: Mapped[Decimal] = mapped_column(_MONEY, nullable=False)
     notes: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[ExpenseStatus] = mapped_column(
+        SAEnum(ExpenseStatus, name="expense_status"),
+        nullable=False,
+        default=ExpenseStatus.PAGADO,
+        server_default=ExpenseStatus.PAGADO.value,
+    )
 
     category: Mapped["Category"] = relationship()
 
