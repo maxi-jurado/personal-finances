@@ -3,12 +3,13 @@
 # deploy.sh — Despliegue local de Finanzas Personales con Docker Compose.
 #
 # Uso:
-#   ./deploy.sh            Construye y levanta el stack (backend + frontend)
-#   ./deploy.sh up --seed  Levanta y además puebla datos de demo
-#   ./deploy.sh seed       Puebla datos de demo en el backend ya levantado
-#   ./deploy.sh down       Detiene y elimina los contenedores
-#   ./deploy.sh logs       Sigue los logs de ambos servicios
-#   ./deploy.sh status     Muestra el estado de los servicios
+#   ./deploy.sh          Construye y levanta el stack en modo productivo
+#                        (crea la base si no existe; nunca la puebla con demo)
+#   ./deploy.sh demo     Construye y levanta el stack, y puebla datos de demo
+#                        si la base está vacía (nunca pisa datos reales)
+#   ./deploy.sh down     Detiene y elimina los contenedores
+#   ./deploy.sh logs     Sigue los logs de ambos servicios
+#   ./deploy.sh status   Muestra el estado de los servicios
 #
 set -euo pipefail
 
@@ -138,14 +139,13 @@ attach_console() {
 }
 
 cmd_up() {
-  local seed_mode="auto" detach=0
+  local mode="$1"; shift || true
+  local detach=0
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --seed)      seed_mode="force" ;;
-      --no-seed)   seed_mode="skip" ;;
       -d|--detach) detach=1 ;;
       "") ;;
-      *) die "Opción desconocida para 'up': $1  (usa: --seed | --no-seed | --detach)" ;;
+      *) die "Opción desconocida: $1  (usa: --detach)" ;;
     esac
     shift
   done
@@ -156,11 +156,7 @@ cmd_up() {
   compose up -d --build
   ok "contenedores arriba"
   wait_healthy
-  case "$seed_mode" in
-    force) seed_demo ;;
-    auto)  ensure_data ;;
-    skip)  : ;;
-  esac
+  [[ "$mode" == "demo" ]] && ensure_data
   summary
 
   # Consola interactiva por defecto; con --detach o sin TTY, deja corriendo y sale.
@@ -177,12 +173,13 @@ usage() {
 deploy.sh — Despliegue local de Finanzas Personales con Docker Compose.
 
 Uso:
-  ./deploy.sh                Construye, levanta y abre la consola en vivo.
-                             Si la base está vacía, crea datos de demo.
-  ./deploy.sh up --no-seed   Igual, pero sin crear datos de demo.
-  ./deploy.sh up --seed      Fuerza recargar los datos de demo (los reemplaza).
-  ./deploy.sh up --detach    Levanta y sale (no abre la consola en vivo).
-  ./deploy.sh seed           Puebla datos de demo en el backend ya levantado.
+  ./deploy.sh                Construye, levanta (modo productivo) y abre la
+                             consola en vivo. Crea la base si no existe;
+                             nunca la puebla con datos de demo.
+  ./deploy.sh demo           Igual, pero si la base está vacía la puebla con
+                             datos de demo (nunca pisa datos reales).
+  ./deploy.sh --detach       Levanta y sale (no abre la consola en vivo).
+                             Combinable: ./deploy.sh demo --detach
   ./deploy.sh down           Detiene y elimina los contenedores.
   ./deploy.sh logs           Sigue los logs de ambos servicios.
   ./deploy.sh status         Muestra el estado de los servicios.
@@ -196,14 +193,13 @@ EOF
 cmd_down()   { detect_compose; step "Deteniendo el stack"; compose down; ok "detenido"; }
 cmd_logs()   { detect_compose; compose logs -f; }
 cmd_status() { detect_compose; compose ps; }
-cmd_seed()   { detect_compose; seed_demo; }
 
-case "${1:-up}" in
-  up)      shift; cmd_up "$@" ;;
+case "${1:-}" in
+  ""|-d|--detach)         cmd_up "prod" "$@" ;;
+  demo)                   shift; cmd_up "demo" "$@" ;;
   down)    cmd_down ;;
   logs)    cmd_logs ;;
   status)  cmd_status ;;
-  seed)    cmd_seed ;;
   -h|--help|help) usage ;;
-  *) die "Comando desconocido: $1  (usa: up | down | logs | status | seed)" ;;
+  *) die "Comando desconocido: $1  (usa: (sin args) | demo | down | logs | status)" ;;
 esac
