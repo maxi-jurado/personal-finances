@@ -26,6 +26,7 @@ import json  # noqa: E402
 from app.database import SessionLocal, init_db  # noqa: E402
 from app.models import (  # noqa: E402
     CardExpense,
+    CardPayment,
     Category,
     Config,
     CreditCard,
@@ -66,6 +67,7 @@ _CATEGORY_NAMES = [
 _MOVEMENT_MODELS = (
     Income,
     CardExpense,
+    CardPayment,
     CreditCard,
     MonthlyExpense,
     FixedExpense,
@@ -140,6 +142,20 @@ def _seed_cards(db) -> dict[str, int]:
     return {c.name: c.id for c in cards}
 
 
+def _seed_card_payments(db, months: list[date], cards: dict[str, int]) -> None:
+    """Un par de pagos demo por tarjeta (D17), en los últimos meses, para que
+    la pantalla de Tarjetas muestre cupo repuesto y no solo gastado."""
+    card1, card2 = cards["Tarjeta 1"], cards["Tarjeta 2"]
+    for m in months[-2:]:
+        db.add_all(
+            [
+                CardPayment(card_id=card1, date=_on(m, 28), amount=Decimal("60000"), notes="Pago tarjeta"),
+                CardPayment(card_id=card2, date=_on(m, 28), amount=Decimal("40000"), notes="Pago tarjeta"),
+            ]
+        )
+    db.commit()
+
+
 def _seed_fixed_expenses(db) -> None:
     """Gastos fijos recurrentes (sin fecha): aplican a todo mes."""
     db.add_all(
@@ -198,13 +214,16 @@ def seed(months: int = 5) -> None:
         _seed_config(db)
         _seed_rates(db)
         _seed_fixed_expenses(db)
-        _seed_monthly(db, _recent_months(months), categories, cards)
+        recent_months = _recent_months(months)
+        _seed_monthly(db, recent_months, categories, cards)
+        _seed_card_payments(db, recent_months, cards)
 
         counts = {
             "categories": db.query(Category).count(),
             "income": db.query(Income).count(),
             "monthly_expenses": db.query(MonthlyExpense).count(),
             "card_expenses": db.query(CardExpense).count(),
+            "card_payments": db.query(CardPayment).count(),
             "fixed_expenses": db.query(FixedExpense).count(),
             "transfers": db.query(Transfer).count(),
             "exchange_rates": db.query(ExchangeRate).count(),
