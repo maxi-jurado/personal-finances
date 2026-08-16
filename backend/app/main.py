@@ -16,6 +16,7 @@ from app.database import init_db
 from app.routers import (
     card_expenses,
     cards,
+    categories,
     config,
     exchange_rates,
     fixed_expenses,
@@ -48,6 +49,7 @@ app.add_middleware(
 app.include_router(config.router)
 app.include_router(exchange_rates.router)
 app.include_router(income.router)
+app.include_router(categories.router)
 app.include_router(cards.router)
 app.include_router(card_expenses.router)
 app.include_router(monthly_expenses.router)

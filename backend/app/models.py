@@ -68,6 +68,15 @@ class Income(Base):
     notes: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
+class Category(Base):
+    """Categoría de gasto (monthly_expenses / card_expenses). Income no la usa."""
+
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+
+
 class CreditCard(Base):
     __tablename__ = "credit_cards"
 

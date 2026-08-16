@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from app.models import Currency  # reexport para el resto de los schemas
 
-__all__ = ["Currency", "ORMModel", "ConfigCreate", "ConfigStatus"]
+__all__ = ["Currency", "ORMModel", "ConfigCreate", "ConfigStatus", "CategoryRead"]
 
 # Orden canónico para derivar la moneda base cuando el wizard no la especifica.
 _CURRENCY_ORDER = (Currency.CLP, Currency.JPY, Currency.USD)
@@ -51,3 +51,10 @@ class ConfigStatus(BaseModel):
     configured: bool
     currencies: list[Currency] | None = None
     base_currency: Currency | None = None
+
+
+class CategoryRead(ORMModel):
+    """Reexportado: lo usan categories.py y los Read de monthly/card expenses."""
+
+    id: int
+    name: str
