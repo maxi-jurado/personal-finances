@@ -40,6 +40,13 @@ class CardStatus(str, enum.Enum):
     DESACTIVADA = "desactivada"
 
 
+def _enum_values(enum_cls: type[enum.Enum]) -> list[str]:
+    """SAEnum guarda por `.name` (mayúscula) salvo que se le pida lo contrario;
+    las migraciones (ver 0006) definieron el DDL y los datos existentes en
+    minúscula (`.value`), así que hay que alinear el tipo a eso."""
+    return [member.value for member in enum_cls]
+
+
 # Tipos numéricos reutilizados. `amount` cubre las 3 monedas (JPY/CLP sin
 # decimales, USD con 2); las tasas necesitan más precisión.
 _MONEY = Numeric(18, 4)
@@ -68,6 +75,22 @@ class ExchangeRate(Base):
     base_currency: Mapped[Currency] = _currency_col(nullable=False)
     target_currency: Mapped[Currency] = _currency_col(nullable=False)
     rate: Mapped[Decimal] = mapped_column(_RATE, nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class UFRate(Base):
+    """Valor diario de la UF (Unidad de Fomento) en CLP (D14 extendido).
+
+    Separado del enum `Currency`/tabla `exchange_rates` a propósito: la UF no
+    es una de las 3 monedas del alcance (D-alcance), solo se usa para
+    aproximar gastos fijos denominados en UF a su equivalente en CLP.
+    """
+
+    __tablename__ = "uf_rates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    date: Mapped[date] = mapped_column(Date, nullable=False, unique=True, index=True)
+    value_clp: Mapped[Decimal] = mapped_column(_RATE, nullable=False)
     fetched_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
@@ -100,7 +123,7 @@ class CreditCard(Base):
     currency: Mapped[Currency] = _currency_col(nullable=False)
     credit_limit: Mapped[Decimal] = mapped_column(_MONEY, nullable=False)
     status: Mapped[CardStatus] = mapped_column(
-        SAEnum(CardStatus, name="card_status"),
+        SAEnum(CardStatus, name="card_status", values_callable=_enum_values),
         nullable=False,
         default=CardStatus.ACTIVA,
         server_default=CardStatus.ACTIVA.value,
@@ -155,7 +178,7 @@ class MonthlyExpense(Base):
     amount: Mapped[Decimal] = mapped_column(_MONEY, nullable=False)
     notes: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[ExpenseStatus] = mapped_column(
-        SAEnum(ExpenseStatus, name="expense_status"),
+        SAEnum(ExpenseStatus, name="expense_status", values_callable=_enum_values),
         nullable=False,
         default=ExpenseStatus.PAGADO,
         server_default=ExpenseStatus.PAGADO.value,
@@ -169,12 +192,17 @@ class MonthlyExpense(Base):
 
 
 class FixedExpense(Base):
+    """Gasto fijo recurrente. `amount` es NULL cuando está denominado en UF
+    (`uf_amount` set): el equivalente en CLP se calcula al vuelo con la UF
+    del día (D14 extendido), no se persiste, para que siga la fluctuación."""
+
     __tablename__ = "fixed_expenses"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     concept: Mapped[str] = mapped_column(String, nullable=False)
     currency: Mapped[Currency] = _currency_col(nullable=False)
-    amount: Mapped[Decimal] = mapped_column(_MONEY, nullable=False)
+    amount: Mapped[Decimal | None] = mapped_column(_MONEY, nullable=True)
+    uf_amount: Mapped[Decimal | None] = mapped_column(_MONEY, nullable=True)
     payment_day: Mapped[int] = mapped_column(nullable=False)
     notes: Mapped[str | None] = mapped_column(String, nullable=True)
 
