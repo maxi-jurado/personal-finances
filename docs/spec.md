@@ -40,7 +40,12 @@ monedas, con conversiones correctas contra la API real de tipo de cambio.
 
 **Fuera (no hacer en v1):**
 - Login / auth / multiusuario.
-- Monedas fuera de CLP/JPY/USD o lógica de conversión multi-par genérica.
+- Monedas fuera de CLP/JPY/USD o lógica de conversión multi-par genérica como
+  moneda transaccional de la app (income, card-expenses, monthly-expenses,
+  transfers, summary siguen siendo estrictamente 3 monedas). La única
+  excepción, acotada y explícita, es la **UF como unidad de referencia para
+  gastos fijos** (D14): no es una moneda del ledger, no se puede usar en
+  ningún otro CRUD, y su único destino de conversión es CLP.
 - Presupuestos, metas, reportes históricos avanzados, export a Excel/PDF.
 - Conversión histórica por fecha (ver Decisión D1).
 - **Vista histórica / navegación multi-mes en el frontend** (ver D9). El
@@ -119,7 +124,8 @@ GET/POST   /api/card-expenses/{card_id}
 GET/POST   /api/card-payments/{card_id}                              -- D17
 GET/POST   /api/monthly-expenses?q=&category_id=&date_from=&date_to=&month=&status=   -- D15, D18
 PATCH      /api/monthly-expenses/{id}/status                                          -- D15
-GET/POST   /api/fixed-expenses
+GET/POST   /api/fixed-expenses                                       -- D14: uf_amount opcional
+GET        /api/uf/latest                                            -- D14
 GET/POST   /api/transfers
 GET        /api/summary?month=YYYY-MM      -- balance consolidado del mes en las 3 monedas
 ```
@@ -349,13 +355,33 @@ funciones y módulos pequeños y con una responsabilidad.
   movimientos); la conversión con la tasa cacheada se usa solo para el
   `total_equivalent` (el patrimonio del mes expresado en las 3 monedas). El
   `effective_rate` sigue siendo `clp_charged / jpy_requested` (D6), informativo.
-- **D14 — UF en gastos fijos (diferido a v2):** algunos gastos fijos (p.ej.
-  créditos) están denominados en **UF**, que **no** es una de las 3 monedas del
-  alcance. En v1 los gastos fijos se registran en CLP/JPY/USD. La conversión
-  UF→CLP por el valor de la UF del mes correspondiente (para mantener el gasto
-  recurrente en un valor aproximado más exacto) se define en un spec aparte; no
-  se implementa en v1. Requiere ampliar el alcance de unidades (ver Boundaries:
-  "Ask first").
+- **D14 — UF en gastos fijos (implementado, extensión acotada del alcance):**
+  algunos gastos fijos (p.ej. créditos) están denominados en **UF**, que
+  **no** es una de las 3 monedas del alcance (CLP/JPY/USD siguen siendo las
+  únicas monedas transaccionales de la app). La misma API de tasas ya usada
+  para D1/D5 (`open.er-api.com`) trae la UF bajo el código ISO `CLF`; se
+  calcula como `(USD→CLP) / (USD→CLF)`. Se agregó una tabla `uf_rates`
+  separada del enum `Currency` (mismo patrón de cache 1x/día que
+  `exchange_rates`, D5), y `fixed_expenses` gana un `uf_amount` opcional: un
+  gasto fijo en UF guarda **solo la cantidad de UF** (no un CLP fijo);
+  `amount` se calcula al vuelo cada vez que se lista o se consolida en
+  `/api/summary` — así el monto en CLP sigue la fluctuación real en vez de
+  quedar congelado al valor de cuando se creó. Un gasto en UF se registra
+  siempre en `currency: CLP` (la UF solo convierte a CLP). `GET
+  /api/uf/latest` expone el valor vigente para mostrarlo como referencia en
+  el formulario antes de guardar.
+
+  **Qué UF se usa (no la de "hoy", la del día de pago):** el cálculo usa la
+  UF del `payment_day` **dentro del mes que corresponde** (el mes consultado
+  en `/api/summary?month=`, o el mes en curso en el listado plano) — un
+  crédito que se cobra el día 1 usa la UF del día 1, aunque se consulte la
+  app el día 20. La API no da histórico (solo el valor vigente al momento de
+  la llamada), así que la exactitud por fecha exacta solo existe para los
+  días en que la app efectivamente corrió y cacheó ese valor
+  (`uf_rates.date`); si no hay dato cacheado para esa fecha exacta (lo más
+  común al principio, o para meses no visitados ese día), cae a la UF
+  cacheada más reciente disponible — mismo criterio de aproximación que D1
+  usa para las tasas de cambio.
 - **D15 — Estado en vez de delete (`monthly_expenses`):** no existe ningún
   delete en la API. Los gastos mensuales se **anulan** por estado
   (`status: pagado | anulado`, default `pagado`) en vez de borrarse — cubre

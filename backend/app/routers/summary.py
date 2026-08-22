@@ -55,5 +55,8 @@ def get_summary(
     except summary_service.SummaryError as exc:
         raise HTTPException(
             status_code=503,
-            detail="No hay tasas de cambio cacheadas; consulta /api/exchange-rates/latest primero.",
+            detail=(
+                "No hay tasas de cambio o valor de UF cacheados; consulta "
+                "/api/exchange-rates/latest o /api/uf/latest primero."
+            ),
         ) from exc

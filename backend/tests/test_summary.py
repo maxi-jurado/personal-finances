@@ -115,6 +115,70 @@ def test_gasto_fijo_cuenta_en_cualquier_mes(client, rates):
         assert _dec(body["balance"]["USD"]) == Decimal("-10")
 
 
+def test_gasto_fijo_en_uf_cuenta_como_clp_usando_la_uf_del_dia(client, rates, db):
+    from app.services import uf as uf_service
+
+    uf_service._store_uf(db, uf_service._today(), Decimal("39000"))
+    client.post(
+        "/api/fixed-expenses",
+        json={"concept": "Crédito hipotecario", "currency": "CLP", "uf_amount": "8.5", "payment_day": 5},
+    )
+
+    body = client.get("/api/summary?month=2026-08").json()
+    esperado = Decimal("8.5") * Decimal("39000")
+    assert _dec(body["expenses"]["CLP"]) == esperado
+    assert _dec(body["balance"]["CLP"]) == -esperado
+
+
+def test_gasto_en_uf_usa_la_uf_del_dia_de_pago_del_mes_no_la_de_hoy(client, rates, db):
+    from app.services import uf as uf_service
+
+    # UF exacta del día de pago (5) dentro del mes consultado (agosto) —
+    # distinta de la UF de "hoy" (que no debería usarse para este cálculo).
+    uf_service._store_uf(db, date(2026, 8, 5), Decimal("38500"))
+    uf_service._store_uf(db, uf_service._today(), Decimal("99999"))
+    client.post(
+        "/api/fixed-expenses",
+        json={"concept": "Crédito hipotecario", "currency": "CLP", "uf_amount": "8.5", "payment_day": 5},
+    )
+
+    body = client.get("/api/summary?month=2026-08").json()
+    esperado = Decimal("8.5") * Decimal("38500")
+    assert _dec(body["expenses"]["CLP"]) == esperado
+
+
+def test_gasto_en_uf_en_un_mes_distinto_cae_a_la_uf_mas_reciente_si_no_hay_exacta(client, rates, db):
+    from app.services import uf as uf_service
+
+    # No hay UF cacheada para el 5 de julio; debe caer a la disponible (hoy).
+    uf_service._store_uf(db, uf_service._today(), Decimal("39000"))
+    client.post(
+        "/api/fixed-expenses",
+        json={"concept": "Crédito hipotecario", "currency": "CLP", "uf_amount": "8.5", "payment_day": 5},
+    )
+
+    body = client.get("/api/summary?month=2026-07").json()
+    esperado = Decimal("8.5") * Decimal("39000")
+    assert _dec(body["expenses"]["CLP"]) == esperado
+
+
+def test_summary_503_si_hay_gasto_en_uf_sin_uf_cacheada(client, rates, monkeypatch):
+    import httpx
+
+    from app.services import uf as uf_service
+
+    client.post(
+        "/api/fixed-expenses",
+        json={"concept": "Crédito hipotecario", "currency": "CLP", "uf_amount": "8.5", "payment_day": 5},
+    )
+    # El post ya cachea la UF del día; forzamos que `get_daily_uf` falle
+    # igual, simulando que ni la cache ni la API están disponibles.
+    monkeypatch.setattr(uf_service, "get_daily_uf", lambda db: (_ for _ in ()).throw(RuntimeError("sin UF")))
+
+    resp = client.get("/api/summary?month=2026-08")
+    assert resp.status_code == 503
+
+
 def test_card_debt_por_tarjeta(client, rates, category_id):
     clp_card = _card(client, name="CLP card", currency="CLP")
     client.post(

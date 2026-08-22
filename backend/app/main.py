@@ -25,6 +25,7 @@ from app.routers import (
     monthly_expenses,
     summary,
     transfers,
+    uf,
 )
 
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:7413")
@@ -58,6 +59,7 @@ app.include_router(monthly_expenses.router)
 app.include_router(fixed_expenses.router)
 app.include_router(transfers.router)
 app.include_router(summary.router)
+app.include_router(uf.router)
 
 
 @app.get("/api/health", tags=["health"])

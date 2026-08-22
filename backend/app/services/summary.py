@@ -34,6 +34,7 @@ from app.models import (
     Transfer,
 )
 from app.services import exchange_rates as fx
+from app.services import uf as uf_service
 
 _TARGETS = (Currency.CLP, Currency.JPY, Currency.USD)
 
@@ -134,8 +135,21 @@ def compute_summary(db: Session, year: int, month: int) -> Summary:
         expense_items.append((m.currency, m.amount))
     for c in card_rows:
         expense_items.append((card_currency[c.card_id], c.amount))
-    for f in db.scalars(select(FixedExpense)):
-        expense_items.append((f.currency, f.amount))
+    fixed_rows = list(db.scalars(select(FixedExpense)))
+    for f in fixed_rows:
+        if f.uf_amount is not None:
+            # UF del día de pago DENTRO del mes consultado (no la de "hoy"):
+            # un crédito que se cobra el día 1 usa la UF del día 1 de ese
+            # mes. Si esa fecha exacta no está cacheada (sin histórico),
+            # cae a la UF disponible más reciente.
+            target = uf_service.payment_date_in_month(f.payment_day, year, month)
+            try:
+                uf_value = uf_service.get_uf_for_date(db, target)
+            except Exception as exc:  # sin cache y API caída
+                raise SummaryError("No hay valor de UF cacheado para consolidar.") from exc
+            expense_items.append((Currency.CLP, f.uf_amount * uf_value))
+        else:
+            expense_items.append((f.currency, f.amount))
 
     # Retiros: dos patas nativas, no son gasto.
     withdrawals = {t: Decimal(0) for t in _TARGETS}
