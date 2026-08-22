@@ -10,6 +10,7 @@
 #   ./deploy.sh down     Detiene y elimina los contenedores
 #   ./deploy.sh logs     Sigue los logs de ambos servicios
 #   ./deploy.sh status   Muestra el estado de los servicios
+#   ./deploy.sh clear-data   Borra el volumen de datos (irreversible, pide confirmación)
 #
 set -euo pipefail
 
@@ -183,6 +184,10 @@ Uso:
   ./deploy.sh down           Detiene y elimina los contenedores.
   ./deploy.sh logs           Sigue los logs de ambos servicios.
   ./deploy.sh status         Muestra el estado de los servicios.
+  ./deploy.sh clear-data     Borra el volumen de datos (config, tarjetas,
+                             movimientos) para volver a un estado en blanco.
+                             Pide confirmación; irreversible. Usa --yes para
+                             saltarla en modo no interactivo.
 
 En la consola en vivo:
   [Ctrl+C]  detiene y baja el stack antes de cerrar.
@@ -194,12 +199,44 @@ cmd_down()   { detect_compose; step "Deteniendo el stack"; compose down; ok "det
 cmd_logs()   { detect_compose; compose logs -f; }
 cmd_status() { detect_compose; compose ps; }
 
+# ── Borra el volumen de datos (config, tarjetas, movimientos). Irreversible. ──
+cmd_clear_data() {
+  local yes=0
+  shift || true
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -y|--yes) yes=1 ;;
+      *) die "Opción desconocida: $1  (usa: --yes)" ;;
+    esac
+    shift
+  done
+
+  detect_compose
+  step "Borrando datos"
+  warn "Esto elimina el volumen de datos completo: configuración, tarjetas,"
+  warn "categorías, ingresos, gastos y retiros. NO se puede deshacer."
+
+  if [[ "$yes" -eq 0 ]]; then
+    if [[ ! -t 0 ]]; then
+      die "Modo no interactivo: pasa --yes para confirmar el borrado (./deploy.sh clear-data --yes)."
+    fi
+    local confirm=""
+    read -r -p "  Escribe 'borrar' para confirmar: " confirm
+    [[ "$confirm" == "borrar" ]] || die "Cancelado. No se borró nada."
+  fi
+
+  compose down -v
+  ok "Datos borrados."
+  info "Corre ./deploy.sh (o ./deploy.sh demo) para levantar de nuevo desde cero."
+}
+
 case "${1:-}" in
   ""|-d|--detach)         cmd_up "prod" "$@" ;;
   demo)                   shift; cmd_up "demo" "$@" ;;
-  down)    cmd_down ;;
-  logs)    cmd_logs ;;
-  status)  cmd_status ;;
+  down)       cmd_down ;;
+  logs)       cmd_logs ;;
+  status)     cmd_status ;;
+  clear-data) cmd_clear_data "$@" ;;
   -h|--help|help) usage ;;
-  *) die "Comando desconocido: $1  (usa: (sin args) | demo | down | logs | status)" ;;
+  *) die "Comando desconocido: $1  (usa: (sin args) | demo | down | logs | status | clear-data)" ;;
 esac
