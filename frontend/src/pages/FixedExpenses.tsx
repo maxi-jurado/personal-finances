@@ -5,21 +5,51 @@ import { CURRENCIES, Currency } from "../api/config";
 import {
   createFixedExpense,
   FixedExpense as ExpenseRow,
+  FixedExpenseCreate,
   listFixedExpenses,
 } from "../api/fixedExpenses";
-import { formatMoney } from "../lib/money";
+import { getLatestUF } from "../api/uf";
+import { Alert, AlertDescription } from "../components/ui/alert";
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
+import { Card } from "../components/ui/card";
+import { Checkbox } from "../components/ui/checkbox";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "../components/ui/field";
+import { Input } from "../components/ui/input";
+import { NumericInput } from "../components/NumericInput";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../components/ui/table";
+import { formatMoney, formatUF } from "../lib/money";
 
 interface FormState {
   concept: string;
+  isUF: boolean;
   currency: Currency;
   amount: string;
+  ufAmount: string;
   paymentDay: string;
 }
 
 const emptyForm = (): FormState => ({
   concept: "",
+  isUF: false,
   currency: "CLP",
   amount: "",
+  ufAmount: "",
   paymentDay: "1",
 });
 
@@ -29,24 +59,34 @@ export default function FixedExpenses() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ufHint, setUfHint] = useState<string | null>(null);
 
   useEffect(() => {
     listFixedExpenses()
       .then(setRows)
       .catch((err: unknown) => setError(errorMessage(err)))
       .finally(() => setLoading(false));
+
+    // Valor de referencia mientras se escribe el monto en UF; no bloquea el
+    // formulario si falla (el backend igual valida al guardar).
+    getLatestUF()
+      .then((res) => setUfHint(formatMoney(res.value_clp, "CLP")))
+      .catch(() => undefined);
   }, []);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  const toggleUF = (checked: boolean) =>
+    setForm((prev) => ({ ...prev, isUF: checked, currency: "CLP" }));
+
   const paymentDay = Number(form.paymentDay);
+  const paymentDayValid =
+    Number.isInteger(paymentDay) && paymentDay >= 1 && paymentDay <= 31;
   const canSubmit =
     form.concept.trim() !== "" &&
-    Number(form.amount) > 0 &&
-    Number.isInteger(paymentDay) &&
-    paymentDay >= 1 &&
-    paymentDay <= 31 &&
+    (form.isUF ? Number(form.ufAmount) > 0 : Number(form.amount) > 0) &&
+    paymentDayValid &&
     !saving;
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -55,12 +95,20 @@ export default function FixedExpenses() {
     setSaving(true);
     setError(null);
     try {
-      const created = await createFixedExpense({
-        concept: form.concept.trim(),
-        currency: form.currency,
-        amount: form.amount,
-        payment_day: paymentDay,
-      });
+      const payload: FixedExpenseCreate = form.isUF
+        ? {
+            concept: form.concept.trim(),
+            currency: "CLP",
+            uf_amount: form.ufAmount,
+            payment_day: paymentDay,
+          }
+        : {
+            concept: form.concept.trim(),
+            currency: form.currency,
+            amount: form.amount,
+            payment_day: paymentDay,
+          };
+      const created = await createFixedExpense(payload);
       setRows((prev) => [...prev, created].sort(byPaymentDay));
       setForm(emptyForm());
     } catch (err: unknown) {
@@ -71,118 +119,156 @@ export default function FixedExpenses() {
   };
 
   return (
-    <section>
-      <h2 className="text-xl font-semibold text-slate-800">Gastos fijos</h2>
-      <p className="mt-1 text-sm text-slate-500">
-        Gastos recurrentes con día de pago (arriendo, créditos, suscripciones).
-      </p>
+    <section className="flex flex-col gap-6">
+      <div>
+        <h2 className="text-xl font-semibold">Gastos fijos</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Gastos recurrentes con día de pago (arriendo, créditos, suscripciones).
+          Los créditos en UF se pueden registrar en UF: el monto en CLP se
+          aproxima con el valor de la UF del día, en vez de quedar congelado.
+        </p>
+      </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="mt-4 grid grid-cols-1 gap-3 rounded-md border border-slate-200 bg-white p-4 sm:grid-cols-6"
-      >
-        <label className="flex flex-col text-sm sm:col-span-3">
-          <span className="text-slate-500">Concepto</span>
-          <input
-            type="text"
-            value={form.concept}
-            onChange={(e) => set("concept", e.target.value)}
-            className="mt-1 rounded border border-slate-300 px-2 py-1"
-          />
-        </label>
-        <label className="flex flex-col text-sm sm:col-span-1">
-          <span className="text-slate-500">Moneda</span>
-          <select
-            value={form.currency}
-            onChange={(e) => set("currency", e.target.value as Currency)}
-            className="mt-1 rounded border border-slate-300 px-2 py-1"
-          >
-            {CURRENCIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col text-sm sm:col-span-1">
-          <span className="text-slate-500">Monto</span>
-          <input
-            type="number"
-            min="0"
-            step="any"
-            inputMode="decimal"
-            value={form.amount}
-            onChange={(e) => set("amount", e.target.value)}
-            className="mt-1 rounded border border-slate-300 px-2 py-1"
-          />
-        </label>
-        <label className="flex flex-col text-sm sm:col-span-1">
-          <span className="text-slate-500">Día de pago</span>
-          <input
-            type="number"
-            min="1"
-            max="31"
-            step="1"
-            inputMode="numeric"
-            value={form.paymentDay}
-            onChange={(e) => set("paymentDay", e.target.value)}
-            className="mt-1 rounded border border-slate-300 px-2 py-1"
-          />
-        </label>
+      <Card className="p-4">
+        <form onSubmit={handleSubmit}>
+          <FieldGroup className="grid grid-cols-1 gap-3 sm:grid-cols-6">
+            <Field className="sm:col-span-3">
+              <FieldLabel htmlFor="fixed-expense-concept">Concepto</FieldLabel>
+              <Input
+                id="fixed-expense-concept"
+                type="text"
+                value={form.concept}
+                onChange={(e) => set("concept", e.target.value)}
+              />
+            </Field>
+            <Field orientation="horizontal" className="sm:col-span-2 sm:items-end">
+              <Checkbox
+                id="fixed-expense-is-uf"
+                checked={form.isUF}
+                onCheckedChange={(checked) => toggleUF(checked === true)}
+              />
+              <FieldLabel htmlFor="fixed-expense-is-uf" className="font-normal">
+                Es un crédito en UF
+              </FieldLabel>
+            </Field>
+            <Field className="sm:col-span-1">
+              <FieldLabel htmlFor="fixed-expense-day">Día de pago</FieldLabel>
+              <NumericInput
+                id="fixed-expense-day"
+                allowDecimal={false}
+                maxLength={2}
+                value={form.paymentDay}
+                onChange={(e) => set("paymentDay", e.target.value)}
+              />
+            </Field>
 
-        <div className="sm:col-span-6">
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-          >
-            {saving ? "Guardando…" : "Agregar gasto fijo"}
-          </button>
-        </div>
-      </form>
+            {form.isUF ? (
+              <Field className="sm:col-span-2">
+                <FieldLabel htmlFor="fixed-expense-uf-amount">Monto en UF</FieldLabel>
+                <NumericInput
+                  id="fixed-expense-uf-amount"
+                  value={form.ufAmount}
+                  onChange={(e) => set("ufAmount", e.target.value)}
+                />
+                {ufHint && (
+                  <FieldDescription>
+                    1 UF ≈ {ufHint} hoy — el valor exacto se recalcula cada vez
+                    que se muestra.
+                  </FieldDescription>
+                )}
+              </Field>
+            ) : (
+              <>
+                <Field className="sm:col-span-1">
+                  <FieldLabel htmlFor="fixed-expense-currency">Moneda</FieldLabel>
+                  <Select
+                    value={form.currency}
+                    onValueChange={(v) => set("currency", v as Currency)}
+                  >
+                    <SelectTrigger id="fixed-expense-currency">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {CURRENCIES.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field className="sm:col-span-1">
+                  <FieldLabel htmlFor="fixed-expense-amount">Monto</FieldLabel>
+                  <NumericInput
+                    id="fixed-expense-amount"
+                    value={form.amount}
+                    onChange={(e) => set("amount", e.target.value)}
+                  />
+                </Field>
+              </>
+            )}
+
+            <div className="sm:col-span-6">
+              <Button type="submit" disabled={!canSubmit}>
+                {saving ? "Guardando…" : "Agregar gasto fijo"}
+              </Button>
+            </div>
+          </FieldGroup>
+        </form>
+      </Card>
 
       {error && (
-        <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-          {error}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
-      <div className="mt-6 overflow-x-auto rounded-md border border-slate-200 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 text-slate-500">
-            <tr>
-              <th className="px-4 py-2 font-medium">Día</th>
-              <th className="px-4 py-2 font-medium">Concepto</th>
-              <th className="px-4 py-2 text-right font-medium">Monto</th>
-            </tr>
-          </thead>
-          <tbody>
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Día</TableHead>
+              <TableHead>Concepto</TableHead>
+              <TableHead className="text-right">Monto</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {loading ? (
-              <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
+              <TableRow>
+                <TableCell colSpan={3} className="py-6 text-center text-muted-foreground">
                   Cargando…
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
+              <TableRow>
+                <TableCell colSpan={3} className="py-6 text-center text-muted-foreground">
                   Sin gastos fijos todavía.
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
               rows.map((row) => (
-                <tr key={row.id} className="border-b border-slate-100 last:border-0">
-                  <td className="px-4 py-2 text-slate-600">{row.payment_day}</td>
-                  <td className="px-4 py-2 text-slate-800">{row.concept}</td>
-                  <td className="px-4 py-2 text-right tabular-nums text-slate-800">
+                <TableRow key={row.id}>
+                  <TableCell className="text-muted-foreground">{row.payment_day}</TableCell>
+                  <TableCell>
+                    {row.concept}
+                    {row.uf_amount && (
+                      <Badge variant="secondary" className="ml-2">
+                        {formatUF(row.uf_amount)} UF
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {row.uf_amount ? "≈ " : ""}
                     {formatMoney(row.amount, row.currency)}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </Card>
     </section>
   );
 }

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 
-import { listCards } from "./api/cards";
 import { ApiError } from "./api/client";
 import { getConfig } from "./api/config";
+import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
+import { Skeleton } from "./components/ui/skeleton";
 import AppShell from "./components/AppShell";
 import Wizard from "./pages/Wizard";
 
@@ -10,15 +11,15 @@ type ShellState =
   | { kind: "loading" }
   | { kind: "error"; message: string }
   | { kind: "wizard-currencies" }
-  | { kind: "wizard-cards" }
   | { kind: "ready" };
 
+// El paso de tarjetas del wizard es solo onboarding: se puede omitir (D17
+// extendido) porque "Tarjetas" ya tiene su propio CRUD para agregarlas
+// después. Por eso acá solo se gatea por moneda configurada, no por
+// cantidad de tarjetas.
 async function resolveState(): Promise<ShellState> {
   const cfg = await getConfig();
   if (!cfg.configured) return { kind: "wizard-currencies" };
-
-  const cards = await listCards(true);
-  if (cards.length === 0) return { kind: "wizard-cards" };
 
   return { kind: "ready" };
 }
@@ -38,22 +39,28 @@ export default function App() {
       });
   }, []);
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-5xl px-4 py-4">
-          <h1 className="text-lg font-semibold">Finanzas Personales</h1>
-          <p className="text-sm text-slate-500">CLP · JPY · USD</p>
-        </div>
-      </header>
+  if (state.kind === "ready") return <AppShell />;
 
-      <main className="mx-auto max-w-5xl px-4 py-8">
-        {state.kind === "loading" && <p className="text-slate-500">Cargando…</p>}
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md">
+        <div className="mb-6 text-center">
+          <h1 className="text-lg font-semibold">Finanzas Personales</h1>
+          <p className="text-sm text-muted-foreground">CLP · JPY · USD</p>
+        </div>
+
+        {state.kind === "loading" && (
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-6 w-2/3" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        )}
 
         {state.kind === "error" && (
-          <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-amber-800">
-            {state.message}
-          </div>
+          <Alert variant="destructive">
+            <AlertTitle>No se pudo conectar</AlertTitle>
+            <AlertDescription>{state.message}</AlertDescription>
+          </Alert>
         )}
 
         {state.kind === "wizard-currencies" && (
@@ -62,13 +69,7 @@ export default function App() {
             onDone={() => setState({ kind: "ready" })}
           />
         )}
-
-        {state.kind === "wizard-cards" && (
-          <Wizard initialStep="cards" onDone={() => setState({ kind: "ready" })} />
-        )}
-
-        {state.kind === "ready" && <AppShell />}
-      </main>
+      </div>
     </div>
   );
 }

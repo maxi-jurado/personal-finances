@@ -14,6 +14,29 @@ import {
 } from "../api/cards";
 import { ApiError } from "../api/client";
 import { CURRENCIES, Currency } from "../api/config";
+import { Alert, AlertDescription } from "../components/ui/alert";
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
+import { Card } from "../components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "../components/ui/field";
+import { Input } from "../components/ui/input";
+import { NumericInput } from "../components/NumericInput";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../components/ui/table";
 import { formatMoney } from "../lib/money";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -162,294 +185,289 @@ export default function Cards() {
   const selected = cards.find((c) => c.id === activeCard) ?? null;
 
   return (
-    <section>
-      <h2 className="text-xl font-semibold text-slate-800">Tarjetas</h2>
-      <p className="mt-1 text-sm text-slate-500">
-        Nombre, moneda y cupo de tus tarjetas. El cupo disponible baja con los
-        gastos y sube con los pagos que registres.
-      </p>
+    <section className="flex flex-col gap-6">
+      <div>
+        <h2 className="text-xl font-semibold">Tarjetas</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Nombre, moneda y cupo de tus tarjetas. El cupo disponible baja con los
+          gastos y sube con los pagos que registres.
+        </p>
+      </div>
 
-      <form
-        onSubmit={handleCreate}
-        className="mt-4 grid grid-cols-1 gap-3 rounded-md border border-slate-200 bg-white p-4 sm:grid-cols-6"
-      >
-        <label className="flex flex-col text-sm sm:col-span-2">
-          <span className="text-slate-500">Nombre</span>
-          <input
-            type="text"
-            placeholder="Banco Santander"
-            value={form.name}
-            onChange={(e) => set("name", e.target.value)}
-            className="mt-1 rounded border border-slate-300 px-2 py-1"
-          />
-        </label>
-        <label className="flex flex-col text-sm sm:col-span-1">
-          <span className="text-slate-500">Moneda</span>
-          <select
-            value={form.currency}
-            onChange={(e) => set("currency", e.target.value as Currency)}
-            className="mt-1 rounded border border-slate-300 px-2 py-1"
-          >
-            {CURRENCIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col text-sm sm:col-span-2">
-          <span className="text-slate-500">Cupo total</span>
-          <input
-            type="number"
-            min="0"
-            step="any"
-            inputMode="decimal"
-            value={form.credit_limit}
-            onChange={(e) => set("credit_limit", e.target.value)}
-            className="mt-1 rounded border border-slate-300 px-2 py-1"
-          />
-        </label>
-        <div className="flex items-end sm:col-span-1">
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className="w-full rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-          >
-            Agregar
-          </button>
-        </div>
-      </form>
+      <Card className="p-4">
+        <form onSubmit={handleCreate}>
+          <FieldGroup className="grid grid-cols-1 gap-3 sm:grid-cols-6">
+            <Field className="sm:col-span-2">
+              <FieldLabel htmlFor="card-name">Nombre</FieldLabel>
+              <Input
+                id="card-name"
+                type="text"
+                placeholder="Banco Santander"
+                value={form.name}
+                onChange={(e) => set("name", e.target.value)}
+              />
+            </Field>
+            <Field className="sm:col-span-1">
+              <FieldLabel htmlFor="card-currency">Moneda</FieldLabel>
+              <Select
+                value={form.currency}
+                onValueChange={(v) => set("currency", v as Currency)}
+              >
+                <SelectTrigger id="card-currency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {CURRENCIES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field className="sm:col-span-2">
+              <FieldLabel htmlFor="card-limit">Cupo total</FieldLabel>
+              <NumericInput
+                id="card-limit"
+                value={form.credit_limit}
+                onChange={(e) => set("credit_limit", e.target.value)}
+              />
+            </Field>
+            <div className="flex items-end sm:col-span-1">
+              <Button type="submit" disabled={!canSubmit} className="w-full">
+                Agregar
+              </Button>
+            </div>
+          </FieldGroup>
+        </form>
+      </Card>
 
       {error && (
-        <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-          {error}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
-      <div className="mt-6 overflow-x-auto rounded-md border border-slate-200 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 text-slate-500">
-            <tr>
-              <th className="px-4 py-2 font-medium">Nombre</th>
-              <th className="px-4 py-2 font-medium">Moneda</th>
-              <th className="px-4 py-2 text-right font-medium">Cupo total</th>
-              <th className="px-4 py-2 text-right font-medium">Disponible</th>
-              <th className="px-4 py-2 font-medium">Estado</th>
-              <th className="px-4 py-2 text-right font-medium">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Moneda</TableHead>
+              <TableHead className="text-right">Cupo total</TableHead>
+              <TableHead className="text-right">Disponible</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {loading ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
+              <TableRow>
+                <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
                   Cargando…
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : cards.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
+              <TableRow>
+                <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
                   Sin tarjetas todavía.
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
               cards.map((card) => (
-                <tr key={card.id} className="border-b border-slate-100 last:border-0">
-                  <td className="px-4 py-2 text-slate-800">
+                <TableRow key={card.id}>
+                  <TableCell>
                     {editingId === card.id ? (
-                      <input
+                      <Input
                         type="text"
                         value={edit.name}
                         onChange={(e) => setEdit((p) => ({ ...p, name: e.target.value }))}
-                        className="rounded border border-slate-300 px-2 py-1"
                         autoFocus
                       />
                     ) : (
                       card.name
                     )}
-                  </td>
-                  <td className="px-4 py-2 text-slate-600">{card.currency}</td>
-                  <td className="px-4 py-2 text-right tabular-nums text-slate-800">
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{card.currency}</TableCell>
+                  <TableCell className="text-right tabular-nums">
                     {editingId === card.id ? (
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        inputMode="decimal"
+                      <NumericInput
                         value={edit.credit_limit}
                         onChange={(e) =>
                           setEdit((p) => ({ ...p, credit_limit: e.target.value }))
                         }
-                        className="w-28 rounded border border-slate-300 px-2 py-1 text-right"
+                        className="w-28 text-right"
                       />
                     ) : (
                       formatMoney(card.credit_limit, card.currency)
                     )}
-                  </td>
-                  <td className="px-4 py-2 text-right tabular-nums text-slate-800">
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
                     {formatMoney(card.available_credit, card.currency)}
-                  </td>
-                  <td className="px-4 py-2">
-                    <span
-                      className={
-                        "rounded-full px-2 py-0.5 text-xs font-medium " +
-                        (card.status === "activa"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-slate-100 text-slate-500")
-                      }
-                    >
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={card.status === "activa" ? "secondary" : "outline"}>
                       {card.status === "activa" ? "Activa" : "Desactivada"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-right">
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
                     {editingId === card.id ? (
                       <>
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleUpdate(card.id)}
                           disabled={saving}
-                          className="mr-2 text-sm font-medium text-slate-700 hover:underline"
                         >
                           Guardar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelEdit}
-                          className="text-sm text-slate-400 hover:underline"
-                        >
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" onClick={cancelEdit}>
                           Cancelar
-                        </button>
+                        </Button>
                       </>
                     ) : (
                       <>
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => startEdit(card)}
-                          className="mr-3 text-sm font-medium text-slate-700 hover:underline"
                         >
                           Editar
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleToggleStatus(card)}
-                          className="text-sm font-medium text-slate-500 hover:underline"
                         >
                           {card.status === "activa" ? "Desactivar" : "Activar"}
-                        </button>
+                        </Button>
                       </>
                     )}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </Card>
 
-      <h3 className="mt-8 text-lg font-semibold text-slate-800">Pagos</h3>
-      <p className="mt-1 text-sm text-slate-500">
-        Registra un pago para reponer el cupo disponible de la tarjeta.
-      </p>
+      <div>
+        <h3 className="text-lg font-semibold">Pagos</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Registra un pago para reponer el cupo disponible de la tarjeta.
+        </p>
 
-      <label className="mt-4 flex max-w-xs flex-col text-sm">
-        <span className="text-slate-500">Tarjeta</span>
-        <select
-          value={activeCard ?? ""}
-          onChange={(e) => setActiveCard(Number(e.target.value))}
-          className="mt-1 rounded border border-slate-300 px-2 py-1"
-        >
-          {cards.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name} ({c.currency})
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {selected && (
-        <>
-          <form
-            onSubmit={handleCreatePayment}
-            className="mt-4 grid grid-cols-1 gap-3 rounded-md border border-slate-200 bg-white p-4 sm:grid-cols-6"
+        <Field className="mt-4 max-w-xs">
+          <FieldLabel htmlFor="card-payment-select">Tarjeta</FieldLabel>
+          <Select
+            value={activeCard !== null ? String(activeCard) : undefined}
+            onValueChange={(v) => setActiveCard(Number(v))}
           >
-            <label className="flex flex-col text-sm sm:col-span-1">
-              <span className="text-slate-500">Fecha</span>
-              <input
-                type="date"
-                value={paymentForm.date}
-                onChange={(e) =>
-                  setPaymentForm((p) => ({ ...p, date: e.target.value }))
-                }
-                className="mt-1 rounded border border-slate-300 px-2 py-1"
-              />
-            </label>
-            <label className="flex flex-col text-sm sm:col-span-2">
-              <span className="text-slate-500">Monto ({selected.currency})</span>
-              <input
-                type="number"
-                min="0"
-                step="any"
-                inputMode="decimal"
-                value={paymentForm.amount}
-                onChange={(e) =>
-                  setPaymentForm((p) => ({ ...p, amount: e.target.value }))
-                }
-                className="mt-1 rounded border border-slate-300 px-2 py-1"
-              />
-            </label>
-            <label className="flex flex-col text-sm sm:col-span-2">
-              <span className="text-slate-500">Notas</span>
-              <input
-                type="text"
-                value={paymentForm.notes}
-                onChange={(e) =>
-                  setPaymentForm((p) => ({ ...p, notes: e.target.value }))
-                }
-                className="mt-1 rounded border border-slate-300 px-2 py-1"
-              />
-            </label>
-            <div className="flex items-end sm:col-span-1">
-              <button
-                type="submit"
-                disabled={Number(paymentForm.amount) <= 0 || saving}
-                className="w-full rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                Pagar
-              </button>
-            </div>
-          </form>
+            <SelectTrigger id="card-payment-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {cards.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.name} ({c.currency})
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
 
-          <div className="mt-4 overflow-x-auto rounded-md border border-slate-200 bg-white">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-200 text-slate-500">
-                <tr>
-                  <th className="px-4 py-2 font-medium">Fecha</th>
-                  <th className="px-4 py-2 font-medium">Notas</th>
-                  <th className="px-4 py-2 text-right font-medium">Monto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
-                      Sin pagos registrados para esta tarjeta.
-                    </td>
-                  </tr>
-                ) : (
-                  payments.map((p) => (
-                    <tr key={p.id} className="border-b border-slate-100 last:border-0">
-                      <td className="px-4 py-2 text-slate-600">{p.date}</td>
-                      <td className="px-4 py-2 text-slate-600">{p.notes ?? "—"}</td>
-                      <td className="px-4 py-2 text-right tabular-nums text-slate-800">
-                        {formatMoney(p.amount, selected.currency)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+        {selected && (
+          <div className="mt-4 flex flex-col gap-4">
+            <Card className="p-4">
+              <form onSubmit={handleCreatePayment}>
+                <FieldGroup className="grid grid-cols-1 gap-3 sm:grid-cols-6">
+                  <Field className="sm:col-span-1">
+                    <FieldLabel htmlFor="card-payment-date">Fecha</FieldLabel>
+                    <Input
+                      id="card-payment-date"
+                      type="date"
+                      value={paymentForm.date}
+                      onChange={(e) =>
+                        setPaymentForm((p) => ({ ...p, date: e.target.value }))
+                      }
+                    />
+                  </Field>
+                  <Field className="sm:col-span-2">
+                    <FieldLabel htmlFor="card-payment-amount">
+                      Monto ({selected.currency})
+                    </FieldLabel>
+                    <NumericInput
+                      id="card-payment-amount"
+                      value={paymentForm.amount}
+                      onChange={(e) =>
+                        setPaymentForm((p) => ({ ...p, amount: e.target.value }))
+                      }
+                    />
+                  </Field>
+                  <Field className="sm:col-span-2">
+                    <FieldLabel htmlFor="card-payment-notes">Notas</FieldLabel>
+                    <Input
+                      id="card-payment-notes"
+                      type="text"
+                      value={paymentForm.notes}
+                      onChange={(e) =>
+                        setPaymentForm((p) => ({ ...p, notes: e.target.value }))
+                      }
+                    />
+                  </Field>
+                  <div className="flex items-end sm:col-span-1">
+                    <Button
+                      type="submit"
+                      disabled={Number(paymentForm.amount) <= 0 || saving}
+                      className="w-full"
+                    >
+                      Pagar
+                    </Button>
+                  </div>
+                </FieldGroup>
+              </form>
+            </Card>
+
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Notas</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {payments.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="py-6 text-center text-muted-foreground">
+                        Sin pagos registrados para esta tarjeta.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    payments.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="text-muted-foreground">{p.date}</TableCell>
+                        <TableCell className="text-muted-foreground">{p.notes ?? "—"}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatMoney(p.amount, selected.currency)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
           </div>
-        </>
-      )}
+        )}
+      </div>
     </section>
   );
 }

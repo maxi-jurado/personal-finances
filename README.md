@@ -7,9 +7,9 @@ monedas: peso chileno (**CLP**), yen japonés (**JPY**) y dólar (**USD**). Pens
 para alguien que vive en Japón con ingresos y gastos repartidos en las tres.
 
 Backend **FastAPI + SQLAlchemy + SQLite**, frontend **React + TypeScript +
-Tailwind (Vite)**, ambos en **Docker**. Es también una pieza de portafolio open
-source, así que la calidad de código, los tests y la documentación importan
-tanto como que funcione.
+Tailwind v4 + shadcn/ui (Vite)**, ambos en **Docker**. Es también una pieza de
+portafolio open source, así que la calidad de código, los tests y la
+documentación importan tanto como que funcione.
 
 > Corre 100% local. Sin login, sin multiusuario, sin exposición a la red: los
 > puertos se ligan solo a `127.0.0.1`.
@@ -44,6 +44,17 @@ tanto como que funcione.
   nativa y se convierten solo al mostrar.
 
 Todo el dinero se maneja con `Decimal`/`Numeric` (nunca `float`).
+
+## UI
+
+El frontend usa **shadcn/ui** (componentes sobre Radix UI + Tailwind v4) como
+sistema de componentes, con un layout de **sidebar colapsable**
+(`AppShell.tsx`). A diferencia de una librería instalada como dependencia
+opaca, los componentes de shadcn se copian directo al repo
+(`frontend/src/components/ui/`, configurados en `components.json`), así quedan
+versionados y son editables como cualquier otro código del proyecto. Es un
+cambio puramente de capa de presentación: la lógica de negocio, validaciones y
+llamadas a la API de cada página quedaron intactas.
 
 ## Capturas
 
@@ -87,6 +98,8 @@ Otros comandos:
 ./deploy.sh down           # detiene y elimina los contenedores
 ./deploy.sh logs           # sigue los logs
 ./deploy.sh status         # estado de los servicios
+./deploy.sh clear-data     # borra el volumen de datos (config, tarjetas, movimientos);
+                            # pide confirmación, irreversible; --yes la salta
 ```
 
 Una vez arriba:
@@ -167,6 +180,8 @@ backend/
   Dockerfile           # corre `alembic upgrade head` antes de uvicorn
 frontend/
   src/{api,components,pages,lib}/   # Cards.tsx, Categories.tsx, MonthlyExpenses.tsx (filtros)…
+  src/components/ui/    # componentes shadcn/ui (Radix + Tailwind v4), copiados al repo
+  components.json       # config del CLI de shadcn (alias, estilo, base color)
   Dockerfile · nginx.conf
 docs/spec.md           # spec v1 + decisiones D1–D18
 tasks/                 # plan e progreso

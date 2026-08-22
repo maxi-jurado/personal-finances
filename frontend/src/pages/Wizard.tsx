@@ -3,6 +3,28 @@ import { useState } from "react";
 import { createCard } from "../api/cards";
 import { ApiError } from "../api/client";
 import { CURRENCIES, Currency, saveConfig } from "../api/config";
+import { Alert, AlertDescription } from "../components/ui/alert";
+import { Button } from "../components/ui/button";
+import { Checkbox } from "../components/ui/checkbox";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "../components/ui/field";
+import { Input } from "../components/ui/input";
+import { NumericInput } from "../components/NumericInput";
+import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 
 type Step = "currencies" | "cards";
 
@@ -68,75 +90,65 @@ function CurrenciesStep({ onNext }: { onNext: () => void }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-md">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+    <form onSubmit={handleSubmit}>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         Paso 1 de 2
       </p>
-      <h2 className="mt-1 text-xl font-semibold text-slate-800">
+      <h2 className="mt-1 text-xl font-semibold">
         ¿Cuáles son tus monedas principales?
       </h2>
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="mt-1 text-sm text-muted-foreground">
         Selecciona al menos 2. Podrás registrar movimientos en cualquiera de ellas.
       </p>
 
-      <fieldset className="mt-4 space-y-2">
-        {CURRENCIES.map((currency) => (
-          <label
-            key={currency}
-            className="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 hover:border-slate-300"
-          >
-            <input
-              type="checkbox"
-              className="h-4 w-4"
-              checked={selected.has(currency)}
-              onChange={() => toggle(currency)}
-            />
-            <span className="text-sm text-slate-700">{CURRENCY_LABELS[currency]}</span>
-          </label>
-        ))}
-      </fieldset>
+      <FieldGroup className="mt-4">
+        <FieldSet>
+          {CURRENCIES.map((currency) => (
+            <Field key={currency} orientation="horizontal">
+              <Checkbox
+                id={`currency-${currency}`}
+                checked={selected.has(currency)}
+                onCheckedChange={() => toggle(currency)}
+              />
+              <FieldLabel htmlFor={`currency-${currency}`} className="font-normal">
+                {CURRENCY_LABELS[currency]}
+              </FieldLabel>
+            </Field>
+          ))}
+        </FieldSet>
 
-      {chosen.length >= 2 && (
-        <fieldset className="mt-6">
-          <legend className="text-sm font-medium text-slate-700">
-            ¿Cuál es tu moneda base?
-          </legend>
-          <p className="mt-1 text-sm text-slate-500">
-            Es la referencia principal para mostrar tus balances.
-          </p>
-          <div className="mt-2 space-y-2">
-            {chosen.map((currency) => (
-              <label
-                key={currency}
-                className="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 hover:border-slate-300"
-              >
-                <input
-                  type="radio"
-                  name="base_currency"
-                  className="h-4 w-4"
-                  checked={base === currency}
-                  onChange={() => setBase(currency)}
-                />
-                <span className="text-sm text-slate-700">{CURRENCY_LABELS[currency]}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      )}
+        {chosen.length >= 2 && (
+          <FieldSet>
+            <FieldLegend variant="label">¿Cuál es tu moneda base?</FieldLegend>
+            <FieldDescription>
+              Es la referencia principal para mostrar tus balances.
+            </FieldDescription>
+            <RadioGroup
+              value={base ?? undefined}
+              onValueChange={(value) => setBase(value as Currency)}
+            >
+              {chosen.map((currency) => (
+                <Field key={currency} orientation="horizontal">
+                  <RadioGroupItem value={currency} id={`base-${currency}`} />
+                  <FieldLabel htmlFor={`base-${currency}`} className="font-normal">
+                    {CURRENCY_LABELS[currency]}
+                  </FieldLabel>
+                </Field>
+              ))}
+            </RadioGroup>
+          </FieldSet>
+        )}
+      </FieldGroup>
 
       {error && (
-        <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-          {error}
-        </div>
+        <Alert variant="destructive" className="mt-4">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
-      <button
-        type="submit"
-        disabled={!canSubmit}
-        className="mt-6 rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-      >
+      <Button type="submit" disabled={!canSubmit} className="mt-6">
         {saving ? "Guardando…" : "Continuar"}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -167,71 +179,69 @@ function CardStep({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-md">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+    <form onSubmit={handleSubmit}>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         Paso 2 de 2
       </p>
-      <h2 className="mt-1 text-xl font-semibold text-slate-800">
-        Registra tu primera tarjeta
-      </h2>
-      <p className="mt-1 text-sm text-slate-500">
+      <h2 className="mt-1 text-xl font-semibold">Registra tu primera tarjeta</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
         Nombre, moneda y cupo total. Podrás agregar más tarjetas después desde
-        "Tarjetas".
+        &quot;Tarjetas&quot;.
       </p>
 
-      <div className="mt-4 space-y-3 rounded-md border border-slate-200 bg-white p-4">
-        <label className="flex flex-col text-sm">
-          <span className="text-slate-500">Nombre</span>
-          <input
+      <FieldGroup className="mt-4">
+        <Field>
+          <FieldLabel htmlFor="wizard-card-name">Nombre</FieldLabel>
+          <Input
+            id="wizard-card-name"
             type="text"
             placeholder="Banco Santander"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="mt-1 rounded border border-slate-300 px-2 py-1"
             autoFocus
           />
-        </label>
-        <label className="flex flex-col text-sm">
-          <span className="text-slate-500">Moneda</span>
-          <select
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value as Currency)}
-            className="mt-1 rounded border border-slate-300 px-2 py-1"
-          >
-            {CURRENCIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col text-sm">
-          <span className="text-slate-500">Cupo total</span>
-          <input
-            type="number"
-            min="0"
-            step="any"
-            inputMode="decimal"
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="wizard-card-currency">Moneda</FieldLabel>
+          <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
+            <SelectTrigger id="wizard-card-currency">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {CURRENCIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="wizard-card-limit">Cupo total</FieldLabel>
+          <NumericInput
+            id="wizard-card-limit"
             value={creditLimit}
             onChange={(e) => setCreditLimit(e.target.value)}
-            className="mt-1 rounded border border-slate-300 px-2 py-1"
           />
-        </label>
-      </div>
+        </Field>
+      </FieldGroup>
 
       {error && (
-        <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-          {error}
-        </div>
+        <Alert variant="destructive" className="mt-4">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
-      <button
-        type="submit"
-        disabled={!canSubmit}
-        className="mt-6 rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-      >
-        {saving ? "Guardando…" : "Terminar"}
-      </button>
+      <div className="mt-6 flex items-center gap-3">
+        <Button type="submit" disabled={!canSubmit}>
+          {saving ? "Guardando…" : "Terminar"}
+        </Button>
+        <Button type="button" variant="ghost" onClick={onDone} disabled={saving}>
+          Omitir por ahora
+        </Button>
+      </div>
     </form>
   );
 }

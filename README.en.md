@@ -7,8 +7,9 @@ Chilean peso (**CLP**), Japanese yen (**JPY**) and US dollar (**USD**). Built fo
 someone living in Japan with income and expenses spread across all three.
 
 Backend **FastAPI + SQLAlchemy + SQLite**, frontend **React + TypeScript +
-Tailwind (Vite)**, both in **Docker**. It's also an open-source portfolio piece,
-so code quality, tests and documentation matter as much as it working.
+Tailwind v4 + shadcn/ui (Vite)**, both in **Docker**. It's also an open-source
+portfolio piece, so code quality, tests and documentation matter as much as it
+working.
 
 > Runs 100% locally. No login, no multi-user, no network exposure: ports are
 > bound only to `127.0.0.1`.
@@ -44,6 +45,17 @@ so code quality, tests and documentation matter as much as it working.
   converted only for display.
 
 All money is handled with `Decimal`/`Numeric` (never `float`).
+
+## UI
+
+The frontend uses **shadcn/ui** (components built on Radix UI + Tailwind v4)
+as its component system, with a **collapsible sidebar** layout
+(`AppShell.tsx`). Unlike a library installed as an opaque dependency, shadcn
+components are copied straight into the repo
+(`frontend/src/components/ui/`, configured via `components.json`), so they're
+versioned and editable like any other project code. This was a purely
+presentation-layer change: each page's business logic, validation and API
+calls were left untouched.
 
 ## Screenshots
 
@@ -86,6 +98,8 @@ Other commands:
 ./deploy.sh down           # stop and remove the containers
 ./deploy.sh logs           # follow the logs
 ./deploy.sh status         # service status
+./deploy.sh clear-data     # wipe the data volume (config, cards, movements);
+                            # asks for confirmation, irreversible; --yes skips it
 ```
 
 Once it's up:
@@ -166,6 +180,8 @@ backend/
   Dockerfile           # runs `alembic upgrade head` before uvicorn
 frontend/
   src/{api,components,pages,lib}/   # Cards.tsx, Categories.tsx, MonthlyExpenses.tsx (filters)…
+  src/components/ui/    # shadcn/ui components (Radix + Tailwind v4), copied into the repo
+  components.json       # shadcn CLI config (alias, style, base color)
   Dockerfile · nginx.conf
 docs/spec.md           # v1 spec + decisions D1–D18
 tasks/                 # plan and progress

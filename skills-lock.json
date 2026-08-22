@@ -55,6 +55,12 @@
       "skillPath": "skills/security-and-hardening/SKILL.md",
       "computedHash": "93c5cdb9dc08fd595ff3bc7221ba81b767b2ad92487cf3a1c8eaa6fc105c2810"
     },
+    "shadcn": {
+      "source": "shadcn-ui/ui",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "c1a68ee06a668aced9ab2b5fbdea5f989864123794eb2e056b339a072dbb7f10"
+    },
     "shipping-and-launch": {
       "source": "addyosmani/agent-skills",
       "sourceType": "github",
